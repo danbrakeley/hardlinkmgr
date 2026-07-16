@@ -17,7 +17,11 @@ file browser: `SmbSession::listDirectory` (async opendir; readdir/closedir are
 local iteration), `src/models/FileListModel` + `FileFilterProxyModel`
 (folders-first in both sort directions via a sort() override that records the
 order), and `src/ui/FileBrowserView` (path box, filter, matches/total label).
-Milestones 3+ (lazy stat, link dialog, multi-view) are not yet implemented.
+Milestone 3 added the lazy link-count fill-in: `SmbSession::statFile` (pipelined
+`smb2_stat_async`) driven by a bounded stat pump in `FileBrowserView`
+(`kMaxStatsInFlight`, visible rows first, navigation drops the unsent backlog
+and orphans in-flight replies by clearing the path→row map). Milestones 4+
+(link dialog, multi-view) are not yet implemented.
 Gotcha discovered in milestone 2: `smb2_destroy_context` flushes pending
 callbacks with `SMB2_STATUS_SHUTDOWN`, so SmbSession callbacks must check
 `m_inTeardown` and only release resources on that path.

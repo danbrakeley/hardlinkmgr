@@ -84,22 +84,33 @@ public:
     // path; replies for concurrent requests can arrive in any order.
     void listDirectory(const QString &path);
 
+    // Requests a per-file stat (the only way to learn the hard-link count —
+    // enumeration never carries it). Answered by fileStatted() or
+    // statFailed(); many stats can be in flight at once (pipelined PDUs).
+    void statFile(const QString &path);
+
 signals:
     void stateChanged(SmbSession::State state);
     void errorOccurred(const QString &message);
     void directoryListed(const QString &path, const QList<FileEntry> &entries);
     void directoryListFailed(const QString &path, const QString &message);
+    void fileStatted(const QString &path, int nlink, quint64 inode);
+    void statFailed(const QString &path, const QString &message);
 
 private:
     struct ListRequest;
+    struct StatRequest;
 
     static void onConnectDone(struct smb2_context *ctx, int status,
                               void *commandData, void *privateData);
     static void onOpendirDone(struct smb2_context *ctx, int status,
                               void *commandData, void *privateData);
+    static void onStatDone(struct smb2_context *ctx, int status,
+                           void *commandData, void *privateData);
 
     void onHostResolved(const QHostInfo &info);
     void startSmbConnect(const QString &server);
+    void statFileNow(const QString &path);
     void service(int revents);
     void syncNotifiersToContext();
     void teardown();
@@ -114,8 +125,10 @@ private:
     QTimer *m_tickTimer = nullptr;
     qintptr m_fd = -1;
     State m_state = State::Disconnected;
+    int m_statDelayMs = 0; // debug throttle, see HLM_STAT_DELAY_MS
     bool m_teardownPending = false;
     bool m_inTeardown = false;
     QString m_pendingError;
     QSet<ListRequest *> m_pendingLists;
+    QSet<StatRequest *> m_pendingStats;
 };

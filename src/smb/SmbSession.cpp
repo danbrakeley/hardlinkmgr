@@ -36,6 +36,14 @@ struct SmbSession::ListRequest
     QString path;
 };
 
+// cb_data for an in-flight stat; also owns the result buffer libsmb2 fills.
+struct SmbSession::StatRequest
+{
+    SmbSession *session;
+    QString path;
+    struct smb2_stat_64 st;
+};
+
 std::optional<SmbShareSpec> SmbShareSpec::fromUrl(const QUrl &url, QString *errorMessage)
 {
     const auto fail = [errorMessage](const QString &msg) -> std::optional<SmbShareSpec> {
@@ -92,6 +100,13 @@ SmbSession::SmbSession(QObject *parent)
     m_tickTimer = new QTimer(this);
     m_tickTimer->setInterval(kTickIntervalMs);
     connect(m_tickTimer, &QTimer::timeout, this, [this] { service(0); });
+
+    // Debug throttle for manual testing (docs/testing.md): a fast LAN server
+    // answers stats too quickly to observe the lazy fill-in, so this delays
+    // each stat by N ms before it is sent, simulating a slow server. Each
+    // delayed stat keeps holding its slot in the view's in-flight window, so
+    // throughput becomes ~(window / delay) stats per second.
+    m_statDelayMs = qEnvironmentVariableIntValue("HLM_STAT_DELAY_MS");
 }
 
 SmbSession::~SmbSession()
@@ -288,6 +303,71 @@ void SmbSession::onOpendirDone(struct smb2_context *ctx, int status,
     emit self->directoryListed(path, entries);
 }
 
+void SmbSession::statFile(const QString &path)
+{
+    if (m_state != State::Connected) {
+        emit statFailed(path, tr("Not connected."));
+        return;
+    }
+    if (m_statDelayMs > 0) {
+        QTimer::singleShot(m_statDelayMs, this, [this, path] { statFileNow(path); });
+        return;
+    }
+    statFileNow(path);
+}
+
+void SmbSession::statFileNow(const QString &path)
+{
+    if (m_state != State::Connected) {
+        // Can happen when a throttled stat fires after a disconnect. The view
+        // has already dropped its in-flight map by then; this reply is ignored.
+        emit statFailed(path, tr("Not connected."));
+        return;
+    }
+
+    QString smbPath = path;
+    while (smbPath.startsWith(QLatin1Char('/'))) {
+        smbPath.remove(0, 1);
+    }
+
+    auto *request = new StatRequest{this, path, {}};
+    if (smb2_stat_async(m_ctx, smbPath.toUtf8().constData(), &request->st,
+                        &SmbSession::onStatDone, request) != 0) {
+        const QString detail = QString::fromUtf8(smb2_get_error(m_ctx));
+        delete request;
+        emit statFailed(path, detail);
+        return;
+    }
+    m_pendingStats.insert(request);
+    syncNotifiersToContext(); // the new PDU usually wants POLLOUT
+}
+
+void SmbSession::onStatDone(struct smb2_context *ctx, int status,
+                            void * /*commandData*/, void *privateData)
+{
+    auto *request = static_cast<StatRequest *>(privateData);
+    SmbSession *self = request->session;
+    const QString path = request->path;
+    const struct smb2_stat_64 st = request->st;
+    self->m_pendingStats.remove(request);
+    delete request;
+
+    if (self->m_inTeardown) {
+        return; // flushed by smb2_destroy_context
+    }
+
+    if (status != 0) {
+        QString detail = QString::fromUtf8(smb2_get_error(ctx));
+        if (detail.isEmpty()) {
+            detail = QString::fromLocal8Bit(std::strerror(-status));
+        }
+        emit self->statFailed(path, detail);
+        return;
+    }
+
+    emit self->fileStatted(path, int(st.smb2_nlink), st.smb2_ino);
+}
+
 void SmbSession::onConnectDone(struct smb2_context *ctx, int status,
                                void * /*commandData*/, void *privateData)
 {
@@ -403,6 +483,8 @@ void SmbSession::teardown()
     // The flush should have consumed every pending request; don't leak if not.
     qDeleteAll(m_pendingLists);
     m_pendingLists.clear();
+    qDeleteAll(m_pendingStats);
+    m_pendingStats.clear();
 }
 
 void SmbSession::setState(State state)

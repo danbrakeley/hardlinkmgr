@@ -67,3 +67,36 @@ Single file browser view.
 - [x] **Case-sensitivity toggle:** the "Aa" toggle starts off
   (case-insensitive). With mixed-case names, turning it on re-sorts with
   uppercase before lowercase; hover shows the explanatory tooltip.
+
+## Milestone 3
+
+Lazy hard-link-count fill-in.
+
+A fast LAN server answers stats too quickly to observe the fill-in. Set the
+debug throttle before launching to simulate a slow server — each stat then
+holds its in-flight slot for N ms before being sent (with the 32-slot window,
+200 ms ≈ 160 stats/s):
+
+```powershell
+$env:HLM_STAT_DELAY_MS = '200'
+.\build\windows\bin\Release\hardlinkmgr.exe
+```
+
+Unset it (`Remove-Item Env:HLM_STAT_DELAY_MS`) for normal behavior.
+
+- [x] **Counts populate:** open a directory with files. The Links column
+  starts as "…" and fills in with real numbers; known hard-linked files show
+  their correct count (e.g. 2), everything else 1.
+- [x] **Visible rows first:** open a directory too big to fit on screen. The
+  rows on screen fill in first; after scrolling to the bottom, the newly
+  visible rows fill in ahead of the untouched middle.
+- [x] **Large directory drains:** leave the biggest directory open. All "…"
+  eventually become numbers, the UI stays responsive throughout, and scrolling
+  during the fill stays smooth.
+- [x] **Navigation cancels:** open a big directory, then navigate away while
+  Links is still filling. The new directory lists and fills normally; no stale
+  counts appear in it.
+- [x] **Sort by Links while filling:** sort on the Links column during a fill.
+  Rows re-order live as counts arrive ("…" and "?" sort below real counts).
+- [x] **Disconnect mid-fill:** disconnect while a big directory is filling.
+  No crash, no errors beyond the normal disconnect; reconnecting works.

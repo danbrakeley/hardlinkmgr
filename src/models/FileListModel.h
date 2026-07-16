@@ -35,6 +35,9 @@ public:
     void setEntries(const QList<FileEntry> &entries);
     const FileEntry &entryAt(int row) const { return m_entries.at(row); }
 
+    // Milestone 3's lazy stat results land here, one row at a time.
+    void setNlink(int row, int nlink);
+
     int rowCount(const QModelIndex &parent = {}) const override;
     int columnCount(const QModelIndex &parent = {}) const override;
     QVariant data(const QModelIndex &index, int role) const override;

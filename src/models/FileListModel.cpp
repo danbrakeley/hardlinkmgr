@@ -19,6 +19,16 @@ void FileListModel::setEntries(const QList<FileEntry> &entries)
     endResetModel();
 }
 
+void FileListModel::setNlink(int row, int nlink)
+{
+    if (row < 0 || row >= m_entries.size() || m_entries[row].nlink == nlink) {
+        return;
+    }
+    m_entries[row].nlink = nlink;
+    const QModelIndex idx = index(row, LinksColumn);
+    emit dataChanged(idx, idx, {Qt::DisplayRole, SortRole});
+}
+
 int FileListModel::rowCount(const QModelIndex &parent) const
 {
     return parent.isValid() ? 0 : int(m_entries.size());
@@ -50,7 +60,11 @@ QVariant FileListModel::data(const QModelIndex &index, int role) const
             if (entry.isDir) {
                 return {};
             }
-            return entry.nlink < 0 ? QStringLiteral("…") : QString::number(entry.nlink);
+            switch (entry.nlink) {
+            case FileEntry::kNlinkUnknown:     return QStringLiteral("…");
+            case FileEntry::kNlinkUnavailable: return QStringLiteral("?");
+            default:                           return QString::number(entry.nlink);
+            }
         case InodeColumn:
             return QString::number(entry.inode);
         }

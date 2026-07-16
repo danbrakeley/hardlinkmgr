@@ -6,12 +6,18 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
+#include <QScrollBar>
 #include <QStyle>
 #include <QToolButton>
 #include <QTreeView>
 #include <QVBoxLayout>
 
 namespace {
+
+// Upper bound on stats in flight per view. High enough to keep the pipe full
+// on a LAN, low enough that navigation away leaves little wasted work (the
+// unsent backlog is simply dropped).
+constexpr int kMaxStatsInFlight = 32;
 
 // There is no stock "case sensitivity" icon, so paint an "Aa".
 QIcon makeCaseSensitivityIcon(QFont font, const QPalette &palette)
@@ -127,6 +133,15 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
             this, &FileBrowserView::onDirectoryListed);
     connect(m_session, &SmbSession::directoryListFailed,
             this, &FileBrowserView::onDirectoryListFailed);
+    connect(m_session, &SmbSession::fileStatted,
+            this, &FileBrowserView::onFileStatted);
+    connect(m_session, &SmbSession::statFailed,
+            this, &FileBrowserView::onStatFailed);
+
+    // Scrolling changes which rows are visible; freed-up slots should go to
+    // them first.
+    connect(m_tree->verticalScrollBar(), &QScrollBar::valueChanged,
+            this, [this] { pumpStats(); });
 
     updateCountLabel();
 }
@@ -156,9 +171,7 @@ void FileBrowserView::onEntryActivated(const QModelIndex &proxyIndex)
     }
     const FileEntry &entry = m_model->entryAt(m_proxy->mapToSource(proxyIndex).row());
     if (entry.isDir) {
-        navigateTo(m_currentPath == QLatin1String("/")
-                       ? QLatin1Char('/') + entry.name
-                       : m_currentPath + QLatin1Char('/') + entry.name);
+        navigateTo(entryPath(entry.name));
     }
 }
 
@@ -173,6 +186,7 @@ void FileBrowserView::onDirectoryListed(const QString &path, const QList<FileEnt
     m_upButton->setEnabled(path != QLatin1String("/"));
     m_model->setEntries(entries);
     updateCountLabel();
+    resetStatQueue();
 }
 
 void FileBrowserView::onDirectoryListFailed(const QString &path, const QString &message)
@@ -184,6 +198,97 @@ void FileBrowserView::onDirectoryListFailed(const QString &path, const QString &
     // Keep showing the last good listing; put its path back in the box.
     m_pathEdit->setText(m_currentPath.isEmpty() ? QStringLiteral("/") : m_currentPath);
     emit errorOccurred(message);
+}
+
+void FileBrowserView::onFileStatted(const QString &path, int nlink, quint64 inode)
+{
+    Q_UNUSED(inode);
+    const auto it = m_statInFlight.constFind(path);
+    if (it == m_statInFlight.constEnd()) {
+        return; // stale: a reply for a directory we've navigated away from
+    }
+    const int row = it.value();
+    m_statInFlight.erase(it);
+    m_model->setNlink(row, nlink);
+    pumpStats();
+}
+
+// A failed stat (e.g. no permission) shows as "?" — no status-bar noise, a
+// whole directory of them would flood it.
+void FileBrowserView::onStatFailed(const QString &path, const QString &message)
+{
+    Q_UNUSED(message);
+    const auto it = m_statInFlight.constFind(path);
+    if (it == m_statInFlight.constEnd()) {
+        return;
+    }
+    const int row = it.value();
+    m_statInFlight.erase(it);
+    m_model->setNlink(row, FileEntry::kNlinkUnavailable);
+    pumpStats();
+}
+
+QString FileBrowserView::entryPath(const QString &name) const
+{
+    return m_currentPath == QLatin1String("/")
+               ? QLatin1Char('/') + name
+               : m_currentPath + QLatin1Char('/') + name;
+}
+
+void FileBrowserView::resetStatQueue()
+{
+    // In-flight replies for the old directory now miss m_statInFlight and are
+    // dropped; the window may transiently hold old + new requests, bounded by
+    // 2 * kMaxStatsInFlight.
+    m_statInFlight.clear();
+    m_statRequested.clear();
+    m_statOrder.clear();
+    m_statCursor = 0;
+    for (int row = 0; row < m_model->rowCount(); ++row) {
+        if (!m_model->entryAt(row).isDir) {
+            m_statOrder.append(row);
+        }
+    }
+    pumpStats();
+}
+
+void FileBrowserView::pumpStats()
+{
+    while (m_statInFlight.size() < kMaxStatsInFlight) {
+        const int row = nextStatRow();
+        if (row < 0) {
+            return;
+        }
+        const QString path = entryPath(m_model->entryAt(row).name);
+        m_statRequested.insert(row);
+        m_statInFlight.insert(path, row);
+        m_session->statFile(path);
+    }
+}
+
+// Picks the next row needing a stat: visible rows first, then listing order.
+int FileBrowserView::nextStatRow()
+{
+    const int viewportBottom = m_tree->viewport()->height();
+    QModelIndex idx = m_tree->indexAt(QPoint(0, 0));
+    while (idx.isValid() && m_tree->visualRect(idx).top() < viewportBottom) {
+        const int row = m_proxy->mapToSource(idx).row();
+        const FileEntry &entry = m_model->entryAt(row);
+        if (!entry.isDir && entry.nlink == FileEntry::kNlinkUnknown
+            && !m_statRequested.contains(row)) {
+            return row;
+        }
+        idx = m_tree->indexBelow(idx);
+    }
+
+    while (m_statCursor < m_statOrder.size()) {
+        const int row = m_statOrder.at(m_statCursor);
+        if (!m_statRequested.contains(row)) {
+            return row;
+        }
+        ++m_statCursor;
+    }
+    return -1;
 }
 
 void FileBrowserView::updateCountLabel()

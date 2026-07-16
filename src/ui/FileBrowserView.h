@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QHash>
+#include <QSet>
 #include <QWidget>
 
 #include "smb/SmbTypes.h"
@@ -38,7 +40,14 @@ private:
     void onEntryActivated(const QModelIndex &proxyIndex);
     void onDirectoryListed(const QString &path, const QList<FileEntry> &entries);
     void onDirectoryListFailed(const QString &path, const QString &message);
+    void onFileStatted(const QString &path, int nlink, quint64 inode);
+    void onStatFailed(const QString &path, const QString &message);
     void updateCountLabel();
+
+    QString entryPath(const QString &name) const;
+    void resetStatQueue();
+    void pumpStats();
+    int nextStatRow();
 
     static QString normalizePath(const QString &path);
 
@@ -54,4 +63,12 @@ private:
     QLabel *m_countLabel = nullptr;
     QString m_currentPath;  // last successfully listed path
     QString m_pendingPath;  // path of the in-flight listing, empty if none
+
+    // Lazy link-count fill-in (milestone 3): a bounded number of stats is in
+    // flight, visible rows are served first, and navigation resets everything
+    // (replies for the old directory miss m_statInFlight and are dropped).
+    QList<int> m_statOrder;          // source rows of all files, listing order
+    int m_statCursor = 0;            // next sequential candidate in m_statOrder
+    QSet<int> m_statRequested;       // source rows already sent (or done)
+    QHash<QString, int> m_statInFlight; // full path -> source row
 };
