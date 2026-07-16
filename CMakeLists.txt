@@ -46,8 +46,15 @@ qt_standard_project_setup()
 
 qt_add_executable(hardlinkmgr
   src/main.cpp
+  src/models/FileFilterProxyModel.cpp
+  src/models/FileFilterProxyModel.h
+  src/models/FileListModel.cpp
+  src/models/FileListModel.h
   src/smb/SmbSession.cpp
   src/smb/SmbSession.h
+  src/smb/SmbTypes.h
+  src/ui/FileBrowserView.cpp
+  src/ui/FileBrowserView.h
   src/ui/MainWindow.cpp
   src/ui/MainWindow.h
 )

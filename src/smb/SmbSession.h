@@ -1,7 +1,11 @@
 #pragma once
 
+#include <QList>
 #include <QObject>
+#include <QSet>
 #include <QString>
+
+#include "smb/SmbTypes.h"
 
 #include <optional>
 
@@ -75,12 +79,23 @@ public:
     // Drops an established connection (Connected -> Disconnected).
     void disconnectFromShare();
 
+    // Requests a listing of a share-absolute path ("/" is the share root).
+    // Answered by directoryListed() or directoryListFailed() with the same
+    // path; replies for concurrent requests can arrive in any order.
+    void listDirectory(const QString &path);
+
 signals:
     void stateChanged(SmbSession::State state);
     void errorOccurred(const QString &message);
+    void directoryListed(const QString &path, const QList<FileEntry> &entries);
+    void directoryListFailed(const QString &path, const QString &message);
 
 private:
+    struct ListRequest;
+
     static void onConnectDone(struct smb2_context *ctx, int status,
+                              void *commandData, void *privateData);
+    static void onOpendirDone(struct smb2_context *ctx, int status,
                               void *commandData, void *privateData);
 
     void onHostResolved(const QHostInfo &info);
@@ -100,5 +115,7 @@ private:
     qintptr m_fd = -1;
     State m_state = State::Disconnected;
     bool m_teardownPending = false;
+    bool m_inTeardown = false;
     QString m_pendingError;
+    QSet<ListRequest *> m_pendingLists;
 };

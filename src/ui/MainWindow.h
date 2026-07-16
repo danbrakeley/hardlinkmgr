@@ -11,6 +11,8 @@ class QLineEdit;
 class QTimer;
 class QToolBar;
 
+class FileBrowserView;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -30,7 +32,8 @@ private:
     QLineEdit *m_urlEdit = nullptr;
     QAction *m_connectAction = nullptr;
     QAction *m_linkAction = nullptr;
-    QLabel *m_centralLabel = nullptr;
+    QLabel *m_centralLabel = nullptr;      // placeholder while not connected
+    FileBrowserView *m_browser = nullptr;  // central widget while connected
     QTimer *m_spinnerTimer = nullptr;
     int m_spinnerAngle = 0;
     QString m_shareDisplayName; // user@host/share of the current/last attempt

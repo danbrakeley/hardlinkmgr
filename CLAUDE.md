@@ -12,8 +12,15 @@ README) is implemented: `src/smb/SmbSession.{h,cpp}` wraps libsmb2's async API
 (driven on the GUI thread via QSocketNotifier + a tick timer — never block, and
 never destroy the context from inside a libsmb2 callback; set the session's
 teardown-pending flag instead), and `src/ui/MainWindow.{h,cpp}` has the
-URL box / password prompt / 3-state connect toolbar. Milestones 2+ (file views,
-lazy stat, link dialog) are not yet implemented.
+URL box / password prompt / 3-state connect toolbar. Milestone 2 added the
+file browser: `SmbSession::listDirectory` (async opendir; readdir/closedir are
+local iteration), `src/models/FileListModel` + `FileFilterProxyModel`
+(folders-first in both sort directions via a sort() override that records the
+order), and `src/ui/FileBrowserView` (path box, filter, matches/total label).
+Milestones 3+ (lazy stat, link dialog, multi-view) are not yet implemented.
+Gotcha discovered in milestone 2: `smb2_destroy_context` flushes pending
+callbacks with `SMB2_STATUS_SHUTDOWN`, so SmbSession callbacks must check
+`m_inTeardown` and only release resources on that path.
 
 ### Threading escape hatch (decided, deliberately deferred)
 

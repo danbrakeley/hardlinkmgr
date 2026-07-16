@@ -28,6 +28,14 @@ constexpr int kPduTimeoutSeconds = 15;
 
 } // namespace
 
+// cb_data for an in-flight opendir; owned by m_pendingLists until its
+// callback runs (or teardown frees the leftovers).
+struct SmbSession::ListRequest
+{
+    SmbSession *session;
+    QString path;
+};
+
 std::optional<SmbShareSpec> SmbShareSpec::fromUrl(const QUrl &url, QString *errorMessage)
 {
     const auto fail = [errorMessage](const QString &msg) -> std::optional<SmbShareSpec> {
@@ -206,10 +214,87 @@ void SmbSession::disconnectFromShare()
     setState(State::Disconnected);
 }
 
+void SmbSession::listDirectory(const QString &path)
+{
+    if (m_state != State::Connected) {
+        emit directoryListFailed(path, tr("Not connected."));
+        return;
+    }
+
+    // libsmb2 takes share-relative paths with no leading slash ("" = root).
+    QString smbPath = path;
+    while (smbPath.startsWith(QLatin1Char('/'))) {
+        smbPath.remove(0, 1);
+    }
+
+    auto *request = new ListRequest{this, path};
+    if (smb2_opendir_async(m_ctx, smbPath.toUtf8().constData(),
+                           &SmbSession::onOpendirDone, request) != 0) {
+        delete request;
+        emit directoryListFailed(path, tr("Could not list %1: %2")
+                                           .arg(path, QString::fromUtf8(smb2_get_error(m_ctx))));
+        return;
+    }
+    m_pendingLists.insert(request);
+    syncNotifiersToContext(); // the new PDU usually wants POLLOUT
+}
+
+void SmbSession::onOpendirDone(struct smb2_context *ctx, int status,
+                               void *commandData, void *privateData)
+{
+    auto *request = static_cast<ListRequest *>(privateData);
+    SmbSession *self = request->session;
+    const QString path = request->path;
+    self->m_pendingLists.remove(request);
+    delete request;
+
+    auto *dir = static_cast<struct smb2dir *>(status == 0 ? commandData : nullptr);
+
+    // During teardown, smb2_destroy_context() flushes pending callbacks with
+    // SMB2_STATUS_SHUTDOWN; just release resources, don't touch state.
+    if (self->m_inTeardown) {
+        if (dir) {
+            smb2_closedir(ctx, dir);
+        }
+        return;
+    }
+
+    if (!dir) {
+        QString detail = QString::fromUtf8(smb2_get_error(ctx));
+        if (detail.isEmpty()) {
+            detail = QString::fromLocal8Bit(std::strerror(-status));
+        }
+        emit self->directoryListFailed(path, tr("Could not list %1: %2").arg(path, detail));
+        return;
+    }
+
+    QList<FileEntry> entries;
+    while (struct smb2dirent *ent = smb2_readdir(ctx, dir)) {
+        const QString name = QString::fromUtf8(ent->name);
+        if (name == QLatin1String(".") || name == QLatin1String("..")) {
+            continue;
+        }
+        FileEntry entry;
+        entry.name = name;
+        entry.isDir = (ent->st.smb2_type == SMB2_TYPE_DIRECTORY);
+        entry.size = ent->st.smb2_size;
+        entry.modified = QDateTime::fromSecsSinceEpoch(qint64(ent->st.smb2_mtime));
+        entry.inode = ent->st.smb2_ino;
+        // entry.nlink stays unknown: enumeration never reports it (see CLAUDE.md).
+        entries.append(entry);
+    }
+    smb2_closedir(ctx, dir);
+
+    emit self->directoryListed(path, entries);
+}
+
 void SmbSession::onConnectDone(struct smb2_context *ctx, int status,
                                void * /*commandData*/, void *privateData)
 {
     auto *self = static_cast<SmbSession *>(privateData);
+    if (self->m_inTeardown) {
+        return; // flushed by smb2_destroy_context; state is already handled
+    }
     if (status < 0) {
         QString detail = QString::fromUtf8(smb2_get_error(ctx));
         if (detail.isEmpty()) {
@@ -303,9 +388,21 @@ void SmbSession::teardown()
     m_writeNotifier = nullptr;
     m_fd = -1;
     if (m_ctx) {
+        // Destroying the context flushes still-pending callbacks with
+        // SMB2_STATUS_SHUTDOWN; m_inTeardown tells them to only release their
+        // resources and leave the session state alone.
+        m_inTeardown = true;
         smb2_destroy_context(m_ctx);
+        m_inTeardown = false;
         m_ctx = nullptr;
     }
+    // A callback flushed above may have set these; left stale, they would tear
+    // down the *next* connection on its first service() pass.
+    m_teardownPending = false;
+    m_pendingError.clear();
+    // The flush should have consumed every pending request; don't leak if not.
+    qDeleteAll(m_pendingLists);
+    m_pendingLists.clear();
 }
 
 void SmbSession::setState(State state)

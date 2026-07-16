@@ -1,5 +1,7 @@
 #include "MainWindow.h"
 
+#include "ui/FileBrowserView.h"
+
 #include <QAction>
 #include <QInputDialog>
 #include <QLabel>
@@ -51,13 +53,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_spinnerTimer->setInterval(80);
     connect(m_spinnerTimer, &QTimer::timeout, this, &MainWindow::advanceSpinner);
 
-    m_centralLabel = new QLabel(this);
-    m_centralLabel->setAlignment(Qt::AlignCenter);
-    m_centralLabel->setEnabled(false); // renders the placeholder text greyed out
-    setCentralWidget(m_centralLabel);
-
     statusBar(); // create it up front so messages have somewhere to go
-    onSessionStateChanged(SmbSession::State::Disconnected);
+    onSessionStateChanged(SmbSession::State::Disconnected); // creates the placeholder
     resize(900, 600);
 }
 
@@ -108,6 +105,13 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         m_connectAction->setToolTip(tr("Connect to the SMB share"));
         m_connectAction->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
         m_urlEdit->setEnabled(true);
+        if (!m_centralLabel) {
+            m_centralLabel = new QLabel(this);
+            m_centralLabel->setAlignment(Qt::AlignCenter);
+            m_centralLabel->setEnabled(false); // renders the placeholder text greyed out
+            setCentralWidget(m_centralLabel); // deletes the browser, if any
+            m_browser = nullptr;
+        }
         m_centralLabel->setText(tr("Not connected.\nEnter smb://user@host:port/share and press Connect."));
         statusBar()->showMessage(tr("Disconnected."));
         break;
@@ -127,8 +131,12 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         m_connectAction->setToolTip(tr("Disconnect from the share"));
         m_connectAction->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
         m_urlEdit->setEnabled(false);
-        m_centralLabel->setText(tr("Connected to %1.\n(File browser views arrive in milestone 2.)")
-                                    .arg(m_shareDisplayName));
+        m_browser = new FileBrowserView(m_session, this);
+        connect(m_browser, &FileBrowserView::errorOccurred,
+                this, &MainWindow::onSessionError);
+        setCentralWidget(m_browser); // deletes the placeholder label
+        m_centralLabel = nullptr;
+        m_browser->navigateTo(QStringLiteral("/"));
         statusBar()->showMessage(tr("Connected to %1.").arg(m_shareDisplayName));
         break;
     }
