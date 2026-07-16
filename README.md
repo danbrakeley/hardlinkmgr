@@ -10,8 +10,8 @@ The share as a lot of existing files that are already copied in multiple places,
 
 - GUI application
 - App starts instantly (no splash screen or loading bars)
-- Keep executable size low and memory footprint while running low (avoid a web stack just to render, aka avoid electron)
-- Cross platform (Windows/amd64 and Linux/amd64 required; macOS/arm nice-to-have, but low priority)
+- Keep resource usage low by avoiding a whole web stack (aka no electron)
+- Cross platform (Windows & Linux required, macOS is nice-to-have)
 - Ideally looks like a native app on each platform
 
 To start, my vision of the App's UI is:
@@ -46,6 +46,28 @@ To start, my vision of the App's UI is:
     - Requires the user to choose the primary file that will be kept
     - At the bottom there's a "Hard Link" button that replaces the non-primary files with a hard link to the primary file.
 
-## TODO
+## Build
 
-- Decide on language and libs/packages.
+Windows, using the MSVC Qt kit (see `docs/decisions/0001-choose-project-language.md`).
+libsmb2 is pulled from the patched fork via CMake `FetchContent`, so no manual
+checkout is needed. Qt is found from the installed kit via the `windows` preset.
+
+First-time build (or any time after editing `CMakeLists.txt`), configure then build:
+
+```powershell
+cmake --preset windows
+cmake --build --preset windows-release
+# -> build\windows\bin\Release\hardlinkmgr.exe
+```
+
+For day-to-day builds where only source has changed, just rebuild:
+
+```powershell
+cmake --build --preset windows-release
+```
+
+Use `windows-debug` in place of `windows-release` for a debug build.
+
+The exe runs standalone: a post-build `windeployqt` step stages Qt's runtime DLLs
+and plugins next to it (it re-runs each build but no-ops when they're current), so
+no need to have Qt on `PATH`.
