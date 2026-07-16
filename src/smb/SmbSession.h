@@ -5,6 +5,7 @@
 
 #include <optional>
 
+class QHostInfo;
 class QSocketNotifier;
 class QTimer;
 class QUrl;
@@ -14,14 +15,24 @@ struct smb2_context;
 // The parsed pieces of a `smb://[domain;]user@host[:port]/share` URL.
 struct SmbShareSpec
 {
-    QString server;  // "host" or "host:port", the form libsmb2 expects
+    QString host;
+    int port = -1;   // -1 means the SMB default (445)
     QString share;   // share name (no slashes)
     QString user;
     QString domain;  // optional workgroup/domain (from the "domain;user" URL syntax)
 
+    // "host", "host:port", or "[v6addr]:port" — the form libsmb2 expects.
+    QString hostPort() const
+    {
+        QString h = host.contains(QLatin1Char(':'))
+                        ? QLatin1Char('[') + host + QLatin1Char(']')
+                        : host;
+        return port != -1 ? h + QLatin1Char(':') + QString::number(port) : h;
+    }
+
     QString displayName() const
     {
-        return user + QLatin1Char('@') + server + QLatin1Char('/') + share;
+        return user + QLatin1Char('@') + hostPort() + QLatin1Char('/') + share;
     }
 
     // Returns std::nullopt and fills *errorMessage if the URL is not a valid
@@ -72,11 +83,16 @@ private:
     static void onConnectDone(struct smb2_context *ctx, int status,
                               void *commandData, void *privateData);
 
+    void onHostResolved(const QHostInfo &info);
+    void startSmbConnect(const QString &server);
     void service(int revents);
     void syncNotifiersToContext();
     void teardown();
     void setState(State state);
 
+    SmbShareSpec m_spec;    // spec of the current/last connection attempt
+    QString m_password;     // held only between connectToShare() and startSmbConnect()
+    int m_lookupId = -1;    // pending QHostInfo lookup, -1 when none
     struct smb2_context *m_ctx = nullptr;
     QSocketNotifier *m_readNotifier = nullptr;
     QSocketNotifier *m_writeNotifier = nullptr;

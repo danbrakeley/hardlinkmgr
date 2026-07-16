@@ -1,5 +1,7 @@
 #include "SmbSession.h"
 
+#include <QHostAddress>
+#include <QHostInfo>
 #include <QSocketNotifier>
 #include <QTimer>
 #include <QUrl>
@@ -46,10 +48,8 @@ std::optional<SmbShareSpec> SmbShareSpec::fromUrl(const QUrl &url, QString *erro
     }
 
     SmbShareSpec spec;
-    spec.server = url.host();
-    if (url.port() != -1) {
-        spec.server += QLatin1Char(':') + QString::number(url.port());
-    }
+    spec.host = url.host();
+    spec.port = url.port();
 
     spec.user = url.userName();
     if (const int sep = spec.user.indexOf(QLatin1Char(';')); sep >= 0) {
@@ -97,29 +97,81 @@ void SmbSession::connectToShare(const SmbShareSpec &spec, const QString &passwor
         return;
     }
 
+    m_spec = spec;
+    m_password = password;
+    setState(State::Connecting);
+
+    // Resolve the hostname with Qt's async lookup before handing it to
+    // libsmb2: smb2_connect_share_async resolves synchronously (getaddrinfo),
+    // which would freeze the UI — unabortably — on slow or failing DNS.
+    // Giving it a numeric address makes its own resolution instant.
+    if (QHostAddress address; address.setAddress(spec.host)) {
+        startSmbConnect(spec.hostPort());
+    } else {
+        m_lookupId = QHostInfo::lookupHost(spec.host, this, &SmbSession::onHostResolved);
+    }
+}
+
+void SmbSession::onHostResolved(const QHostInfo &info)
+{
+    m_lookupId = -1;
+    if (m_state != State::Connecting || m_ctx) {
+        return; // aborted or otherwise stale
+    }
+
+    if (info.error() != QHostInfo::NoError || info.addresses().isEmpty()) {
+        const QString error = tr("Could not resolve host \"%1\": %2")
+                                  .arg(m_spec.host, info.errorString());
+        m_password.clear();
+        setState(State::Disconnected);
+        emit errorOccurred(error);
+        return;
+    }
+
+    // Pick one address, preferring IPv4. (This forgoes libsmb2's own
+    // multi-address fallback, which is fine for the LAN hosts this targets.)
+    QHostAddress chosen = info.addresses().first();
+    for (const QHostAddress &address : info.addresses()) {
+        if (address.protocol() == QAbstractSocket::IPv4Protocol) {
+            chosen = address;
+            break;
+        }
+    }
+
+    QString server = chosen.toString();
+    if (server.contains(QLatin1Char(':'))) {
+        server = QLatin1Char('[') + server + QLatin1Char(']'); // IPv6 literal
+    }
+    if (m_spec.port != -1) {
+        server += QLatin1Char(':') + QString::number(m_spec.port);
+    }
+    startSmbConnect(server);
+}
+
+void SmbSession::startSmbConnect(const QString &server)
+{
     m_ctx = smb2_init_context();
     if (!m_ctx) {
+        m_password.clear();
+        setState(State::Disconnected);
         emit errorOccurred(tr("Failed to initialize the SMB client context."));
         return;
     }
 
     smb2_set_security_mode(m_ctx, SMB2_NEGOTIATE_SIGNING_ENABLED);
     smb2_set_timeout(m_ctx, kPduTimeoutSeconds);
-    if (!spec.domain.isEmpty()) {
-        smb2_set_domain(m_ctx, spec.domain.toUtf8().constData());
+    if (!m_spec.domain.isEmpty()) {
+        smb2_set_domain(m_ctx, m_spec.domain.toUtf8().constData());
     }
     // Always set a password, even an empty one: auth is NTLMSSP (Kerberos is
     // compiled out), and it needs a password value for password-less shares too.
-    smb2_set_password(m_ctx, password.toUtf8().constData());
+    smb2_set_password(m_ctx, m_password.toUtf8().constData());
+    m_password.clear();
 
-    setState(State::Connecting);
-
-    // Note: name resolution inside this call is synchronous, so a slow DNS
-    // server can stall the UI briefly. Revisit if it becomes noticeable.
     if (smb2_connect_share_async(m_ctx,
-                                 spec.server.toUtf8().constData(),
-                                 spec.share.toUtf8().constData(),
-                                 spec.user.toUtf8().constData(),
+                                 server.toUtf8().constData(),
+                                 m_spec.share.toUtf8().constData(),
+                                 m_spec.user.toUtf8().constData(),
                                  &SmbSession::onConnectDone, this) != 0) {
         const QString error = tr("Connection failed: %1")
                                   .arg(QString::fromUtf8(smb2_get_error(m_ctx)));
@@ -239,6 +291,11 @@ void SmbSession::syncNotifiersToContext()
 // m_teardownPending instead, and service() finishes the job afterwards.
 void SmbSession::teardown()
 {
+    if (m_lookupId != -1) {
+        QHostInfo::abortHostLookup(m_lookupId);
+        m_lookupId = -1;
+    }
+    m_password.clear();
     m_tickTimer->stop();
     delete m_readNotifier;
     m_readNotifier = nullptr;

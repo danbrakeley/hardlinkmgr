@@ -15,6 +15,16 @@ teardown-pending flag instead), and `src/ui/MainWindow.{h,cpp}` has the
 URL box / password prompt / 3-state connect toolbar. Milestones 2+ (file views,
 lazy stat, link dialog) are not yet implemented.
 
+### Threading escape hatch (decided, deliberately deferred)
+
+`SmbSession` runs libsmb2 on the GUI thread; nothing there blocks (DNS runs on
+QHostInfo's worker pool — do not reintroduce libsmb2's own blocking resolver).
+If milestone 2/3 testing shows UI stutter during large directory enumerations
+or the per-file stat fan-out, the agreed fix is `moveToThread` on the session —
+its surface is already all signals/slots, so internals and callers stay
+unchanged. Do **not** switch to libsmb2's sync API to solve a stutter: that
+forfeits abortability and the pipelined stats milestone 3 depends on.
+
 ### Build (Windows)
 
 ```powershell

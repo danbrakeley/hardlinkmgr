@@ -41,7 +41,7 @@ FetchContent_MakeAvailable(libsmb2)
 # Qt — found from the installed kit. CMAKE_PREFIX_PATH is supplied by the
 # active CMake preset (see CMakePresets.json).
 # ---------------------------------------------------------------------------
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
 qt_standard_project_setup()
 
 qt_add_executable(hardlinkmgr
@@ -58,6 +58,7 @@ target_include_directories(hardlinkmgr PRIVATE src)
 # Flip to a GUI app later with: set_target_properties(hardlinkmgr PROPERTIES WIN32_EXECUTABLE ON)
 target_link_libraries(hardlinkmgr PRIVATE
   Qt6::Widgets
+  Qt6::Network   # QHostInfo: async DNS ahead of libsmb2's blocking resolver
   smb2
 )
 

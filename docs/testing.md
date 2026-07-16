@@ -14,6 +14,10 @@ SMB session + connect toolbar.
   reports the connection.
 - [ ] **Disconnect:** click Disconnect on an established connection. The app
   returns to the disconnected state and the URL box becomes editable again.
+- [ ] **Unresolvable host:** connect to a bogus hostname (e.g.
+  `smb://user@foo/bar`). The UI stays responsive with the spinner showing (no
+  freeze), Abort works during the lookup, and if left alone the attempt fails
+  with a "could not resolve host" error in the status bar.
 - [ ] **Abort mid-attempt:** connect to an unroutable IP (e.g.
   `smb://user@192.0.2.1/share`) so the attempt hangs, then click Abort while the
   spinner is showing. The app returns immediately to the disconnected state.
