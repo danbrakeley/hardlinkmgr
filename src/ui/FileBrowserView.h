@@ -8,6 +8,7 @@ class QItemSelectionModel;
 class QLabel;
 class QLineEdit;
 class QModelIndex;
+class QToolButton;
 class QTreeView;
 
 class FileFilterProxyModel;
@@ -45,7 +46,10 @@ private:
     FileListModel *m_model = nullptr;
     FileFilterProxyModel *m_proxy = nullptr;
     QTreeView *m_tree = nullptr;
+    QToolButton *m_upButton = nullptr;
     QLineEdit *m_pathEdit = nullptr;
+    QToolButton *m_foldersFirstButton = nullptr;
+    QToolButton *m_caseSensitiveButton = nullptr;
     QLineEdit *m_filterEdit = nullptr;
     QLabel *m_countLabel = nullptr;
     QString m_currentPath;  // last successfully listed path

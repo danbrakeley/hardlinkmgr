@@ -58,3 +58,12 @@ Single file browser view.
   threading escape hatch in CLAUDE.md).
 - [x] **Disconnect/reconnect:** disconnect while browsing, reconnect. A fresh
   view appears at `/`.
+- [x] **Parent button:** the up button left of the path box is disabled at
+  `/`, enabled after descending into a folder, and navigates to the immediate
+  parent when clicked.
+- [x] **Folders-first toggle:** the folder-icon toggle starts on (folders
+  grouped on top). Turning it off re-sorts folders alphabetically among the
+  files; turning it back on regroups them, in both sort directions.
+- [x] **Case-sensitivity toggle:** the "Aa" toggle starts off
+  (case-insensitive). With mixed-case names, turning it on re-sorts with
+  uppercase before lowercase; hover shows the explanatory tooltip.

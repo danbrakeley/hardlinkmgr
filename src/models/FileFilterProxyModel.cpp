@@ -11,6 +11,15 @@ FileFilterProxyModel::FileFilterProxyModel(QObject *parent)
     setFilterKeyColumn(FileListModel::NameColumn);
 }
 
+void FileFilterProxyModel::setFoldersFirst(bool foldersFirst)
+{
+    if (m_foldersFirst == foldersFirst) {
+        return;
+    }
+    m_foldersFirst = foldersFirst;
+    invalidate(); // re-sorts with the stored column/order
+}
+
 // lessThan() has no access to the active sort order, but folders must stay on
 // top in both directions — so remember the order and pre-invert below.
 void FileFilterProxyModel::sort(int column, Qt::SortOrder order)
@@ -21,10 +30,12 @@ void FileFilterProxyModel::sort(int column, Qt::SortOrder order)
 
 bool FileFilterProxyModel::lessThan(const QModelIndex &left, const QModelIndex &right) const
 {
-    const bool leftIsDir = left.data(FileListModel::IsDirRole).toBool();
-    const bool rightIsDir = right.data(FileListModel::IsDirRole).toBool();
-    if (leftIsDir != rightIsDir) {
-        return m_order == Qt::AscendingOrder ? leftIsDir : rightIsDir;
+    if (m_foldersFirst) {
+        const bool leftIsDir = left.data(FileListModel::IsDirRole).toBool();
+        const bool rightIsDir = right.data(FileListModel::IsDirRole).toBool();
+        if (leftIsDir != rightIsDir) {
+            return m_order == Qt::AscendingOrder ? leftIsDir : rightIsDir;
+        }
     }
     return QSortFilterProxyModel::lessThan(left, right);
 }

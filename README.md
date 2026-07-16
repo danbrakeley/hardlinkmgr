@@ -27,7 +27,10 @@ To start, my vision of the App's UI is:
   - The main view under the toolbar shows one or more views until the SMB share's filesystem
     - Each filesystem view includes:
       - Toolbar
+        - Icon button that navigates up to the immediate parent folder (disabled at the share root)
         - Text box with current path (doesn't include the `smb://...` URL, only shows `/absolute/path/for/this/view`). Each view starts at `/`, the root of the connected share.
+        - Icon toggle button (with explanatory tooltip): folders always sorted to the top (default) vs folders sorted amongst the files
+        - Icon toggle button (with explanatory tooltip): name sorting case insensitive (default) vs case sensitive
         - Text box with search filter (just simple plain text match, case insensitive)
         - Text label that shows total files, and if there's a filter, number of files that match the filter, in the form "filter_matches / total_files".
       - File list

@@ -5,8 +5,30 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPainter>
+#include <QStyle>
+#include <QToolButton>
 #include <QTreeView>
 #include <QVBoxLayout>
+
+namespace {
+
+// There is no stock "case sensitivity" icon, so paint an "Aa".
+QIcon makeCaseSensitivityIcon(QFont font, const QPalette &palette)
+{
+    QPixmap pixmap(32, 32);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::TextAntialiasing);
+    font.setBold(true);
+    font.setPixelSize(20);
+    painter.setFont(font);
+    painter.setPen(palette.color(QPalette::ButtonText));
+    painter.drawText(pixmap.rect(), Qt::AlignCenter, QStringLiteral("Aa"));
+    return QIcon(pixmap);
+}
+
+} // namespace
 
 #include "models/FileFilterProxyModel.h"
 #include "models/FileListModel.h"
@@ -20,9 +42,43 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     m_proxy = new FileFilterProxyModel(this);
     m_proxy->setSourceModel(m_model);
 
+    m_upButton = new QToolButton(this);
+    m_upButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogToParent));
+    m_upButton->setToolTip(tr("Go up to the parent folder"));
+    m_upButton->setAutoRaise(true);
+    m_upButton->setEnabled(false); // no parent until a listing below "/" succeeds
+    connect(m_upButton, &QToolButton::clicked, this, [this] {
+        if (m_currentPath.isEmpty() || m_currentPath == QLatin1String("/")) {
+            return;
+        }
+        const int slash = m_currentPath.lastIndexOf(QLatin1Char('/'));
+        navigateTo(slash <= 0 ? QStringLiteral("/") : m_currentPath.left(slash));
+    });
+
     m_pathEdit = new QLineEdit(QStringLiteral("/"), this);
     connect(m_pathEdit, &QLineEdit::returnPressed,
             this, &FileBrowserView::onPathEdited);
+
+    m_foldersFirstButton = new QToolButton(this);
+    m_foldersFirstButton->setIcon(style()->standardIcon(QStyle::SP_DirIcon));
+    m_foldersFirstButton->setCheckable(true);
+    m_foldersFirstButton->setChecked(true);
+    m_foldersFirstButton->setAutoRaise(true);
+    m_foldersFirstButton->setToolTip(tr("Keep folders sorted to the top.\n"
+                                        "When off, folders sort among the files."));
+    connect(m_foldersFirstButton, &QToolButton::toggled, this, [this](bool on) {
+        m_proxy->setFoldersFirst(on);
+    });
+
+    m_caseSensitiveButton = new QToolButton(this);
+    m_caseSensitiveButton->setIcon(makeCaseSensitivityIcon(font(), palette()));
+    m_caseSensitiveButton->setCheckable(true); // off by default: case-insensitive
+    m_caseSensitiveButton->setAutoRaise(true);
+    m_caseSensitiveButton->setToolTip(tr("Sort names case-sensitively (uppercase sorts before lowercase).\n"
+                                         "When off, sorting ignores case."));
+    connect(m_caseSensitiveButton, &QToolButton::toggled, this, [this](bool on) {
+        m_proxy->setSortCaseSensitivity(on ? Qt::CaseSensitive : Qt::CaseInsensitive);
+    });
 
     m_filterEdit = new QLineEdit(this);
     m_filterEdit->setPlaceholderText(tr("Filter"));
@@ -55,7 +111,10 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
                           m_tree->iconSize().isValid() ? m_tree->iconSize().width() + 12 : 28);
 
     auto *toolbarLayout = new QHBoxLayout;
+    toolbarLayout->addWidget(m_upButton);
     toolbarLayout->addWidget(m_pathEdit, /*stretch*/ 3);
+    toolbarLayout->addWidget(m_foldersFirstButton);
+    toolbarLayout->addWidget(m_caseSensitiveButton);
     toolbarLayout->addWidget(m_filterEdit, /*stretch*/ 1);
     toolbarLayout->addWidget(m_countLabel);
 
@@ -111,6 +170,7 @@ void FileBrowserView::onDirectoryListed(const QString &path, const QList<FileEnt
     m_pendingPath.clear();
     m_currentPath = path;
     m_pathEdit->setText(path);
+    m_upButton->setEnabled(path != QLatin1String("/"));
     m_model->setEntries(entries);
     updateCountLabel();
 }
