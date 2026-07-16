@@ -4,12 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Pre-implementation, but the stack is decided. The repo contains the product
-vision (`README.md`), two SMB feasibility spikes under `spikes/`, and the
-decision record `docs/decisions/0001-choose-project-language.md`. The application
-itself is not scaffolded yet — there is no app build system, so this file has no
-build/test/run commands to give until one exists. Add them here once the CMake
-project lands.
+Scaffolded, pre-feature. The repo contains the product vision and milestones
+(`README.md`), two SMB feasibility spikes under `spikes/`, the decision record
+`docs/decisions/0001-choose-project-language.md`, and a CMake skeleton that
+builds the app against Qt Widgets and the patched libsmb2. Milestone 1 (see
+README) is implemented: `src/smb/SmbSession.{h,cpp}` wraps libsmb2's async API
+(driven on the GUI thread via QSocketNotifier + a tick timer — never block, and
+never destroy the context from inside a libsmb2 callback; set the session's
+teardown-pending flag instead), and `src/ui/MainWindow.{h,cpp}` has the
+URL box / password prompt / 3-state connect toolbar. Milestones 2+ (file views,
+lazy stat, link dialog) are not yet implemented.
+
+### Build (Windows)
+
+```powershell
+cmake --preset windows          # configure (first time, or after CMakeLists.txt edits)
+cmake --build --preset windows-release
+# -> build\windows\bin\Release\hardlinkmgr.exe (runs standalone; windeployqt stages Qt DLLs)
+```
+
+Use `windows-debug` for a debug build. Linux presets (`linux-debug`,
+`linux-release`) exist but are not yet exercised (milestone 6).
 
 ## Technology stack (decided — see ADR 0001)
 
@@ -45,7 +60,7 @@ A GUI desktop app for manually deduplicating files on an SMB share by replacing 
 - **Small binary + low memory footprint** — the README explicitly rules out Electron / a web rendering stack for this reason. Prefer native/lightweight GUI toolkits.
 - **Cross-platform, in priority order:** Windows/amd64 and Linux/amd64 are required; macOS/arm is a nice-to-have, low priority.
 - **Native look-and-feel** on each platform is a goal.
-- Must operate over **SMB** (connect to `host_or_ip:port`) and manipulate **hard links + inode metadata** (hard link count, inode number are shown in the UI and are core to the feature). Proven feasible via the patched libsmb2 (see stack section); re-verify if libsmb2 or the target server changes.
+- Must operate over **SMB** (connect via a `smb://user@host_or_ip:port/share` URL; password prompted at connect time, never persisted) and manipulate **hard links + inode metadata** (hard link count, inode number are shown in the UI and are core to the feature). Proven feasible via the patched libsmb2 (see stack section); re-verify if libsmb2 or the target server changes.
 
 ## UI model (from the README — the intended structure)
 

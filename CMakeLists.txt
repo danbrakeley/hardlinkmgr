@@ -46,7 +46,13 @@ qt_standard_project_setup()
 
 qt_add_executable(hardlinkmgr
   src/main.cpp
+  src/smb/SmbSession.cpp
+  src/smb/SmbSession.h
+  src/ui/MainWindow.cpp
+  src/ui/MainWindow.h
 )
+
+target_include_directories(hardlinkmgr PRIVATE src)
 
 # Note: intentionally a console app for now (stdout visible during early dev).
 # Flip to a GUI app later with: set_target_properties(hardlinkmgr PROPERTIES WIN32_EXECUTABLE ON)
@@ -61,6 +67,9 @@ target_link_libraries(hardlinkmgr PRIVATE
 # This is required for any TU that includes libsmb2 on Windows.
 if(WIN32)
   target_compile_definitions(hardlinkmgr PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+
+  # main.cpp calls WSAStartup itself (libsmb2 leaves Winsock init to the app).
+  target_link_libraries(hardlinkmgr PRIVATE ws2_32)
 
   # Stage Qt's runtime DLLs (and plugins) next to the exe after each build so it
   # runs / double-clicks without Qt on PATH. windeployqt auto-detects the build
