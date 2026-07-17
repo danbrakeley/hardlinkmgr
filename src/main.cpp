@@ -18,6 +18,10 @@ int main(int argc, char *argv[])
 #endif
 
     QApplication app(argc, argv);
+    // Identify the app for QSettings (remembered server URL, etc.).
+    QCoreApplication::setOrganizationName(QStringLiteral("brakeley"));
+    QCoreApplication::setOrganizationDomain(QStringLiteral("brakeley.net"));
+    QCoreApplication::setApplicationName(QStringLiteral("hardlinkmgr"));
 
     MainWindow window;
     window.show();

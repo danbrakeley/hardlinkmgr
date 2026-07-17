@@ -9,11 +9,15 @@
 #include <QLineEdit>
 #include <QPainter>
 #include <QSet>
+#include <QSettings>
+#include <QSplitter>
 #include <QStatusBar>
 #include <QStyle>
 #include <QTimer>
 #include <QToolBar>
 #include <QUrl>
+
+#include <utility>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -33,6 +37,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_urlEdit = new QLineEdit(this);
     m_urlEdit->setPlaceholderText(QStringLiteral("smb://user@host:port/share"));
     m_urlEdit->setClearButtonEnabled(true);
+    m_urlEdit->setText(QSettings().value(QStringLiteral("connect/lastUrl")).toString());
     m_urlEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_toolBar->addWidget(m_urlEdit);
 
@@ -52,6 +57,12 @@ MainWindow::MainWindow(QWidget *parent)
     m_linkAction->setToolTip(tr("Replace selected files with hard links (select at least two files)"));
     connect(m_linkAction, &QAction::triggered,
             this, &MainWindow::onLinkActionTriggered);
+
+    m_addViewAction = m_toolBar->addAction(tr("Add View"));
+    m_addViewAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
+    m_addViewAction->setToolTip(tr("Add another filesystem view below the current ones"));
+    m_addViewAction->setEnabled(false);
+    connect(m_addViewAction, &QAction::triggered, this, &MainWindow::addView);
 
     m_spinnerTimer = new QTimer(this);
     m_spinnerTimer->setInterval(80);
@@ -113,8 +124,9 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
             m_centralLabel = new QLabel(this);
             m_centralLabel->setAlignment(Qt::AlignCenter);
             m_centralLabel->setEnabled(false); // renders the placeholder text greyed out
-            setCentralWidget(m_centralLabel); // deletes the browser, if any
-            m_browser = nullptr;
+            setCentralWidget(m_centralLabel); // deletes the splitter and its views
+            m_splitter = nullptr;
+            m_views.clear();
         }
         m_centralLabel->setText(tr("Not connected.\nEnter smb://user@host:port/share and press Connect."));
         statusBar()->showMessage(tr("Disconnected."));
@@ -135,16 +147,48 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         m_connectAction->setToolTip(tr("Disconnect from the share"));
         m_connectAction->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
         m_urlEdit->setEnabled(false);
-        m_browser = new FileBrowserView(m_session, this);
-        connect(m_browser, &FileBrowserView::errorOccurred,
-                this, &MainWindow::onSessionError);
-        connect(m_browser, &FileBrowserView::selectionChanged,
-                this, &MainWindow::updateLinkAction);
-        setCentralWidget(m_browser); // deletes the placeholder label
+        QSettings().setValue(QStringLiteral("connect/lastUrl"), m_urlEdit->text().trimmed());
+        m_splitter = new QSplitter(Qt::Vertical, this);
+        m_splitter->setChildrenCollapsible(false);
+        setCentralWidget(m_splitter); // deletes the placeholder label
         m_centralLabel = nullptr;
-        m_browser->navigateTo(QStringLiteral("/"));
+        addView();
         statusBar()->showMessage(tr("Connected to %1.").arg(m_shareDisplayName));
         break;
+    }
+    m_addViewAction->setEnabled(state == SmbSession::State::Connected);
+    updateLinkAction();
+}
+
+void MainWindow::addView()
+{
+    if (!m_splitter) {
+        return;
+    }
+    auto *view = new FileBrowserView(m_session, this);
+    connect(view, &FileBrowserView::errorOccurred,
+            this, &MainWindow::onSessionError);
+    connect(view, &FileBrowserView::selectionChanged,
+            this, &MainWindow::updateLinkAction);
+    connect(view, &FileBrowserView::closeRequested,
+            this, [this, view] { removeView(view); });
+    m_views.append(view);
+    m_splitter->addWidget(view);
+    view->navigateTo(QStringLiteral("/"));
+    for (FileBrowserView *v : std::as_const(m_views)) {
+        v->setClosable(m_views.size() > 1);
+    }
+}
+
+void MainWindow::removeView(FileBrowserView *view)
+{
+    if (m_views.size() <= 1 || !m_views.contains(view)) {
+        return;
+    }
+    m_views.removeOne(view);
+    view->deleteLater(); // the splitter drops it once deleted
+    for (FileBrowserView *v : std::as_const(m_views)) {
+        v->setClosable(m_views.size() > 1);
     }
     updateLinkAction();
 }
@@ -153,10 +197,12 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
 void MainWindow::updateLinkAction()
 {
     int count = 0;
-    if (m_session->state() == SmbSession::State::Connected && m_browser) {
+    if (m_session->state() == SmbSession::State::Connected) {
         QSet<QString> paths;
-        for (const SelectedFile &file : m_browser->selectedFiles()) {
-            paths.insert(file.path);
+        for (const FileBrowserView *view : std::as_const(m_views)) {
+            for (const SelectedFile &file : view->selectedFiles()) {
+                paths.insert(file.path);
+            }
         }
         count = paths.size();
     }
@@ -165,17 +211,16 @@ void MainWindow::updateLinkAction()
 
 void MainWindow::onLinkActionTriggered()
 {
-    if (!m_browser) {
-        return;
-    }
     // Gather across all views, dropping duplicate paths (the same file can be
-    // selected in more than one view once milestone 5 adds them).
+    // selected in more than one view).
     QList<SelectedFile> files;
     QSet<QString> seen;
-    for (const SelectedFile &file : m_browser->selectedFiles()) {
-        if (!seen.contains(file.path)) {
-            seen.insert(file.path);
-            files.append(file);
+    for (const FileBrowserView *view : std::as_const(m_views)) {
+        for (const SelectedFile &file : view->selectedFiles()) {
+            if (!seen.contains(file.path)) {
+                seen.insert(file.path);
+                files.append(file);
+            }
         }
     }
     if (files.size() < 2) {
@@ -184,8 +229,11 @@ void MainWindow::onLinkActionTriggered()
 
     HardLinkDialog dialog(m_session, files, this);
     if (dialog.exec() == QDialog::Accepted) {
-        // A run happened (even a partly failed one changes the share).
-        m_browser->refresh();
+        // A run happened (even a partly failed one changes the share); every
+        // view may be showing affected files or link counts.
+        for (FileBrowserView *view : std::as_const(m_views)) {
+            view->refresh();
+        }
     }
 }
 

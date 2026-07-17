@@ -25,8 +25,12 @@ link flow: `SmbSession` mutating ops (rename/link/unlink) with request-id
 completion signals that always fire asynchronously (queued even on immediate
 failure and on teardown-flush, so a handler never re-enters a context being
 destroyed), and `src/ui/HardLinkDialog` running the per-victim
-rename → link → unlink sequence with rename-back on link failure. Milestone 5+
-(multi-view, polish) and milestone 6 (Linux build) remain.
+rename → link → unlink sequence with rename-back on link failure. Milestone 5 added
+multiple views (vertical `QSplitter`, per-view close buttons, "Add View"
+toolbar action; Link gathers/dedupes selection across all views and refreshes
+all views after a run), the remembered last URL (`QSettings`; password never
+persisted), and the flip to a GUI-subsystem executable (`WIN32_EXECUTABLE ON`
+— no stdout on Windows anymore). Milestone 6 (Linux build) remains.
 Gotcha discovered in milestone 2: `smb2_destroy_context` flushes pending
 callbacks with `SMB2_STATUS_SHUTDOWN`, so SmbSession callbacks must check
 `m_inTeardown` and only release resources on that path.

@@ -97,6 +97,14 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
 
     m_countLabel = new QLabel(this);
 
+    m_closeButton = new QToolButton(this);
+    m_closeButton->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton));
+    m_closeButton->setToolTip(tr("Close this view"));
+    m_closeButton->setAutoRaise(true);
+    m_closeButton->setVisible(false); // shown once there is more than one view
+    connect(m_closeButton, &QToolButton::clicked,
+            this, [this] { emit closeRequested(); });
+
     m_tree = new QTreeView(this);
     m_tree->setModel(m_proxy);
     m_tree->setRootIsDecorated(false);
@@ -126,6 +134,7 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     toolbarLayout->addWidget(m_caseSensitiveButton);
     toolbarLayout->addWidget(m_filterEdit, /*stretch*/ 1);
     toolbarLayout->addWidget(m_countLabel);
+    toolbarLayout->addWidget(m_closeButton);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(4, 4, 4, 4);
@@ -167,6 +176,11 @@ void FileBrowserView::refresh()
     if (!m_currentPath.isEmpty()) {
         navigateTo(m_currentPath);
     }
+}
+
+void FileBrowserView::setClosable(bool closable)
+{
+    m_closeButton->setVisible(closable);
 }
 
 void FileBrowserView::navigateTo(const QString &path)

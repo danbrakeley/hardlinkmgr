@@ -42,9 +42,13 @@ public:
     // The files (never folders) currently selected in this view.
     QList<SelectedFile> selectedFiles() const;
 
+    // Shows/hides this view's close button (hidden while it is the only view).
+    void setClosable(bool closable);
+
 signals:
     void errorOccurred(const QString &message); // surfaced in the main status bar
     void selectionChanged(); // fires on user selection and on listing changes
+    void closeRequested();   // the view's close button was clicked
 
 private:
     void onPathEdited();
@@ -72,6 +76,7 @@ private:
     QToolButton *m_caseSensitiveButton = nullptr;
     QLineEdit *m_filterEdit = nullptr;
     QLabel *m_countLabel = nullptr;
+    QToolButton *m_closeButton = nullptr;
     QString m_currentPath;  // last successfully listed path
     QString m_pendingPath;  // path of the in-flight listing, empty if none
 

@@ -133,3 +133,24 @@ in a test directory** — the run replaces file contents by design.
   steps fail with "Disconnected.", no crash; check the share for a stranded
   `*.hlmgr-tmp` and restore it manually if present (this is the documented
   cost of aborting mid-sequence).
+
+## Milestone 5
+
+Multiple views + polish.
+
+- [x] **Add view:** connect, then click "Add View". A second view appears
+  below the first in a resizable splitter, starting at `/`, with its own
+  path, filter, and sort toggles working independently.
+- [x] **Close view:** with 2+ views, each shows a close button at the right
+  of its toolbar; with only one view the button is hidden. Closing removes
+  just that view.
+- [x] **Cross-view selection:** select one file in one view and one in
+  another — Link enables. The same file selected in both views counts once
+  (Link stays disabled until a second distinct file is selected).
+- [x] **Cross-view link run:** link a file from view A with a file from
+  view B. After Close, *all* views refresh (both show updated link counts).
+- [x] **No console window:** launching the exe (double-click from Explorer)
+  opens only the app window, no console.
+- [x] **Remembered URL:** connect successfully, quit, relaunch. The URL box
+  is pre-filled with the last share URL; only the password is asked for
+  again (never stored).

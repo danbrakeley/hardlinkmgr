@@ -63,8 +63,9 @@ qt_add_executable(hardlinkmgr
 
 target_include_directories(hardlinkmgr PRIVATE src)
 
-# Note: intentionally a console app for now (stdout visible during early dev).
-# Flip to a GUI app later with: set_target_properties(hardlinkmgr PROPERTIES WIN32_EXECUTABLE ON)
+# GUI app (no console window); was a console app during early development.
+set_target_properties(hardlinkmgr PROPERTIES WIN32_EXECUTABLE ON)
+
 target_link_libraries(hardlinkmgr PRIVATE
   Qt6::Widgets
   Qt6::Network   # QHostInfo: async DNS ahead of libsmb2's blocking resolver
