@@ -24,7 +24,7 @@ struct SelectedFile
     FileEntry entry;
 };
 
-// One filesystem view (README): path box, case-insensitive filter box,
+// One filesystem view: path box, case-insensitive filter box,
 // "matches / total" label, and the file table. The full listing stays in
 // memory; the proxy decides what is shown.
 class FileBrowserView : public QWidget

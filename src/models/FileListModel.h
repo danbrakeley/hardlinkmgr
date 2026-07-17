@@ -6,8 +6,8 @@
 
 #include "smb/SmbTypes.h"
 
-// Holds the full in-memory file list of one filesystem view (README: the view
-// keeps everything, the filter proxy decides what is shown).
+// Holds the full in-memory file list of one filesystem view (the view keeps
+// everything, the filter proxy decides what is shown).
 class FileListModel : public QAbstractTableModel
 {
     Q_OBJECT

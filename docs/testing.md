@@ -1,7 +1,7 @@
 # Manual Testing
 
 Checklists for verifying each milestone against the real target server (see the
-milestone list in the project `README.md`). Automated tests can't cover these:
+milestone list in `milestones.md`). Automated tests can't cover these:
 they depend on a live SMB server's behavior.
 
 ## Milestone 1

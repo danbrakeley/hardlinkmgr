@@ -13,7 +13,7 @@ class QTreeWidgetItem;
 
 class SmbSession;
 
-// The Hard Link dialog (README): lists the selected files, requires choosing
+// The Hard Link dialog: lists the selected files, requires choosing
 // the primary to keep, then replaces each other file with a hard link to the
 // primary. Per victim the sequence is
 //     rename victim -> victim.hlmgr-tmp

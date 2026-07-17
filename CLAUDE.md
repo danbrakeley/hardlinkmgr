@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-Scaffolded, pre-feature. The repo contains the product vision and milestones
-(`README.md`), two SMB feasibility spikes under `spikes/`, the decision record
-`docs/decisions/0001-choose-project-language.md`, and a CMake skeleton that
-builds the app against Qt Widgets and the patched libsmb2. Milestone 1 (see
-README) is implemented: `src/smb/SmbSession.{h,cpp}` wraps libsmb2's async API
+All six POC milestones are complete (list in `docs/milestones.md`; future
+ideas in `docs/roadmap.md`). The repo contains the product vision and build
+docs (`README.md`), two SMB feasibility spikes under `spikes/`, the decision
+records under `docs/decisions/`, and a CMake build of the app against Qt
+Widgets and the patched libsmb2. Milestone 1 (see `docs/milestones.md`)
+is implemented: `src/smb/SmbSession.{h,cpp}` wraps libsmb2's async API
 (driven on the GUI thread via QSocketNotifier + a tick timer — never block, and
 never destroy the context from inside a libsmb2 callback; set the session's
 teardown-pending flag instead), and `src/ui/MainWindow.{h,cpp}` has the
@@ -102,12 +103,12 @@ A GUI desktop app for manually deduplicating files on an SMB share by replacing 
 ## Hard constraints (these drive the tech-stack choice — treat as requirements)
 
 - **Instant startup** — no splash screen or loading bar.
-- **Small binary + low memory footprint** — the README explicitly rules out Electron / a web rendering stack for this reason. Prefer native/lightweight GUI toolkits.
+- **Small binary + low memory footprint** — the README's constraints ("lightweight", "low resource usage") rule out Electron / a web rendering stack. Prefer native/lightweight GUI toolkits.
 - **Cross-platform, in priority order:** Windows/amd64 and Linux/amd64 are required; macOS/arm is a nice-to-have, low priority.
 - **Native look-and-feel** on each platform is a goal.
 - Must operate over **SMB** (connect via a `smb://user@host_or_ip:port/share` URL; password prompted at connect time, never persisted) and manipulate **hard links + inode metadata** (hard link count, inode number are shown in the UI and are core to the feature). Proven feasible via the patched libsmb2 (see stack section); re-verify if libsmb2 or the target server changes.
 
-## UI model (from the README — the intended structure)
+## UI model (as built — the running app is the source of truth; planned changes live in `docs/roadmap.md`)
 
 - **Main window toolbar:** SMB connect/disconnect control (connect → spinner/abort → disconnect states) and a "Link" button (enabled only when ≥2 files are selected across any file list).
 - **One or more filesystem views**, each with its own path box, case-insensitive plain-text search filter, and a "matches / total" count label. Each view keeps the full file list in memory but only displays entries matching the filter. Folders sort to the top. Columns: icon, name, size, date modified, hard-link count, inode number.

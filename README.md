@@ -1,84 +1,29 @@
 # Hard Link Manager
 
-## Problem
+## Original Problem
 
-I have a single SMB file share that needs a bunch of large files to be in multiple sub folders at the same time, each with a different name. I want to use hard links to avoid actually storing the files multiple times.
+I ended up in the position where I had a remote SMB file share with multiple copies of the same large files. The file names didn't match, and in some cases the file sizes didn't match either, and I wanted a way to identify two (or more) files by hand, then [hard link](https://en.wikipedia.org/wiki/Hard_link) them to each other to avoid wasting space.
 
-The share as a lot of existing files that are already copied in multiple places, and in some cases the files are slightly different (including slightly different sizes), so just running a program like jdupes won't catch everything. Instead, I need to be able to manually identify which files should be the same, and then choose which one to keep, and which one to replace with a hard link.
+While there are existing applications to identify duplicates and replace them with hard links (i.e. [jdupes](https://codeberg.org/jbruchon/jdupes)), my situation involved files that didn't always have exactly the same size, but I generally knew where to find the two files, and just wanted a way to help me locate known duplicates and then explicitly hard link them to the same bytes.
 
-## Proposed Solution
+## Constraints
 
 - GUI application
-- App starts instantly (no splash screen or loading bars)
-- Keep resource usage low by avoiding a whole web stack (aka no electron)
+- App starts instantly (lightweight)
+- Low resource usage
 - Cross platform (Windows & Linux required, macOS is nice-to-have)
-- Ideally looks like a native app on each platform
+- Looks and feels like a native app on each platform (OS has good solutions for hotkeys/UX, don't re-invent the wheel)
 
-To start, my vision of the App's UI is:
+## UI/UX
 
-- Application Window
-  - Toolbar
-    - Text box where you enter the URL of the SMB share to connect to, in the format `smb://user@host_or_ip:port/share` (port is optional).
-    - Button for connecting/disconnecting to given share
-      - when connected, it shows a disconnect icon, and clicking it disconnects
-      - when disconnected, it shows a connect icon, and clicking it pops up a dialog asking for the password (left empty if no password is needed), then attempts to connect
-      - during a connection attempt, the icon changes to a spinner, and clicking the button aborts the connection attempt and returns to the disconnected state
-    - Button "Link" for creating hard links; only active when at least two files are selected in any of the file lists (see below). Triggers the "Hard Link" dialog (see below).
-  - The main view under the toolbar shows one or more views until the SMB share's filesystem
-    - Each filesystem view includes:
-      - Toolbar
-        - Icon button that navigates up to the immediate parent folder (disabled at the share root)
-        - Text box with current path (doesn't include the `smb://...` URL, only shows `/absolute/path/for/this/view`). Each view starts at `/`, the root of the connected share.
-        - Icon toggle button (with explanatory tooltip): folders always sorted to the top (default) vs folders sorted amongst the files
-        - Icon toggle button (with explanatory tooltip): name sorting case insensitive (default) vs case sensitive
-        - Text box with search filter (just simple plain text match, case insensitive)
-        - Text label that shows total files, and if there's a filter, number of files that match the filter, in the form "filter_matches / total_files".
-      - File list
-        - Keeps full file/folder list in memory, but only shows entries that match the search filter in the
-        - Folders sorted to the top
-        - Columns:
-          - icon: Folder icon for folders, file icon for files (keep it simple for now)
-          - name
-          - size
-          - date modified
-          - hard Link count
-          - inode number
-  - Hard Link dialog
-    - Triggered by the main window toolbar Link button
-    - Shows a list of all the selected files
-    - Requires the user to choose the primary file that will be kept
-    - At the bottom there's a "Hard Link" button that replaces the non-primary files with a hard link to the primary file.
+TODO: add some screen shots, maybe an animation, and maybe some short descriptions.
 
-## Milestones
+## Documents
 
-Each milestone is independently verifiable against the real share.
-
-1. **SMB session + connect toolbar.** An `SmbSession` wrapper around the patched
-   libsmb2 (async API, driven from the Qt event loop) with connect/abort/disconnect,
-   wired to the toolbar's URL box, password dialog, and 3-state connect button.
-   *Verify: connect to the real server, abort mid-attempt, disconnect.*
-2. **Single file browser view.** Directory enumeration into a
-   `QAbstractTableModel` + `QSortFilterProxyModel`, with the search filter, live
-   "matches / total" count, folders-first sorting, and navigation (double-click
-   folders, editable path box). The hard-link-count column shows a placeholder,
-   since SMB2 enumeration doesn't return link counts.
-   *Verify: browse the real share, filter, sort.*
-3. **Lazy hard-link-count fill-in.** On directory load, queue a per-file async
-   stat (bounded in-flight window, visible rows first) to populate the link-count
-   column; cancel stale requests on navigation.
-   *Verify: link counts populate correctly against known hard-linked files.*
-4. **Cross-view selection + Hard Link dialog + link execution.** Enable the Link
-   button when ≥2 files are selected across all views; the dialog requires
-   choosing a primary, then per victim: rename to a temp name, hard-link the
-   primary into the victim's path, delete the temp (rename back on failure, so
-   the victim is never lost until the link exists), then refresh affected views.
-   *Verify: end-to-end on throwaway files — link count 1 → 2, shared inode,
-   victim content replaced.*
-5. **Multiple views + polish.** Add/remove views on a splitter, error surfacing,
-   remember the last server URL (`QSettings`, password never persisted), flip to
-   a GUI (non-console) executable.
-6. **Linux build.** Exercise the existing `linux-*` CMake presets, fix any
-   platform fallout, document the Linux setup below.
+- [milestones.md](./docs/milestones.md) - The milestones to get the POC behavior up and running
+- [roadmap.md](./docs/roadmap.md) - Where this app is heading
+- [ADRs](./docs/decisions/) - Architectural Decision Records
+- [testing.md](./docs/testing.md) - List of intended behavior, in checklist form
 
 ## Build
 
