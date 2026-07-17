@@ -84,6 +84,12 @@ $env:HLM_STAT_DELAY_MS = '200'
 
 Unset it (`Remove-Item Env:HLM_STAT_DELAY_MS`) for normal behavior.
 
+On Linux:
+
+```bash
+HLM_STAT_DELAY_MS=200 ./build/linux-release/bin/hardlinkmgr
+```
+
 - [x] **Counts populate:** open a directory with files. The Links column
   starts as "…" and fills in with real numbers; known hard-linked files show
   their correct count (e.g. 2), everything else 1.
@@ -154,3 +160,21 @@ Multiple views + polish.
 - [x] **Remembered URL:** connect successfully, quit, relaunch. The URL box
   is pre-filled with the last share URL; only the password is asked for
   again (never stored).
+
+## Milestone 6
+
+Linux build (Ubuntu 26.04, setup per the Linux section of `README.md`).
+
+- [x] **Clean build:** on a fresh system with only the documented apt
+  packages, `linux-debug` and `linux-release` both configure and build with
+  no errors (no source changes were needed over the Windows build).
+- [x] **Launch:** the built binary starts under the default Wayland session
+  and shows the main window.
+- [x] **Connect + browse:** connect to the real share, browse and filter a
+  directory (milestone 1/2 spot check on this platform).
+- [x] **Link counts:** the Links column fills in against known hard-linked
+  files (milestone 3 spot check).
+- [x] **Link run:** end-to-end hard-link run on throwaway copies
+  (milestone 4 spot check).
+- [x] **Remembered URL:** the last URL persists across relaunch
+  (`QSettings` lands in `~/.config` on Linux).

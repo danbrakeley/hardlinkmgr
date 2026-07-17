@@ -30,7 +30,10 @@ multiple views (vertical `QSplitter`, per-view close buttons, "Add View"
 toolbar action; Link gathers/dedupes selection across all views and refreshes
 all views after a run), the remembered last URL (`QSettings`; password never
 persisted), and the flip to a GUI-subsystem executable (`WIN32_EXECUTABLE ON`
-— no stdout on Windows anymore). Milestone 6 (Linux build) remains.
+— no stdout on Windows anymore). Milestone 6 (Linux build) is done: on Ubuntu
+26.04 the `linux-*` presets build with system Qt 6.10 and no source changes;
+apt packages are documented in README's Linux build section, and the
+against-the-real-share spot checks live in `docs/testing.md` (Milestone 6).
 Gotcha discovered in milestone 2: `smb2_destroy_context` flushes pending
 callbacks with `SMB2_STATUS_SHUTDOWN`, so SmbSession callbacks must check
 `m_inTeardown` and only release resources on that path.
@@ -45,7 +48,9 @@ its surface is already all signals/slots, so internals and callers stay
 unchanged. Do **not** switch to libsmb2's sync API to solve a stutter: that
 forfeits abortability and the pipelined stats milestone 3 depends on.
 
-### Build (Windows)
+### Build
+
+Windows (MSVC kit, multi-config):
 
 ```powershell
 cmake --preset windows          # configure (first time, or after CMakeLists.txt edits)
@@ -53,8 +58,18 @@ cmake --build --preset windows-release
 # -> build\windows\bin\Release\hardlinkmgr.exe (runs standalone; windeployqt stages Qt DLLs)
 ```
 
-Use `windows-debug` for a debug build. Linux presets (`linux-debug`,
-`linux-release`) exist but are not yet exercised (milestone 6).
+Use `windows-debug` for a debug build.
+
+Linux (system Qt from apt — package list in README's Linux build section;
+single-config presets, one build dir each):
+
+```bash
+cmake --preset linux-release    # configure (first time, or after CMakeLists.txt edits)
+cmake --build --preset linux-release
+# -> build/linux-release/bin/hardlinkmgr (runs in place; Qt links dynamically)
+```
+
+Use `linux-debug` in place of `linux-release` for a debug build.
 
 ## Technology stack (decided — see ADR 0001)
 

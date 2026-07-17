@@ -82,9 +82,13 @@ Each milestone is independently verifiable against the real share.
 
 ## Build
 
-Windows, using the MSVC Qt kit (see `docs/decisions/0001-choose-project-language.md`).
-libsmb2 is pulled from the patched fork via CMake `FetchContent`, so no manual
-checkout is needed. Qt is found from the installed kit via the `windows` preset.
+On every platform, libsmb2 is pulled from the patched fork via CMake
+`FetchContent`, so no manual checkout is needed.
+
+### Windows
+
+Uses the MSVC Qt kit (see `docs/decisions/0001-choose-project-language.md`).
+Qt is found from the installed kit via the `windows` preset.
 
 First-time build (or any time after editing `CMakeLists.txt`), configure then build:
 
@@ -105,3 +109,31 @@ Use `windows-debug` in place of `windows-release` for a debug build.
 The exe runs standalone: a post-build `windeployqt` step stages Qt's runtime DLLs
 and plugins next to it (it re-runs each build but no-ops when they're current), so
 no need to have Qt on `PATH`.
+
+### Linux
+
+Tested on Ubuntu 26.04. One-time setup on a fresh system (on top of `git`,
+`curl`, and `build-essential`):
+
+```bash
+sudo apt install cmake ninja-build qt6-base-dev qt6-wayland libgl1-mesa-dev
+```
+
+- `cmake` + `ninja-build` — the `linux-*` presets use the Ninja generator.
+- `qt6-base-dev` — Qt Widgets/Network development files (Qt 6.10 on 26.04).
+- `qt6-wayland` — Qt's Wayland platform plugin, so the app runs natively on
+  Ubuntu's default Wayland session.
+- `libgl1-mesa-dev` — OpenGL headers, required when linking against Qt6::Gui.
+
+Configure then build (reconfigure only after `CMakeLists.txt` edits):
+
+```bash
+cmake --preset linux-release
+cmake --build --preset linux-release
+# -> build/linux-release/bin/hardlinkmgr
+```
+
+Use `linux-debug` in place of `linux-release` for a debug build; unlike the
+multi-config Windows preset, each Linux preset is single-config with its own
+build directory, so both coexist. Qt links dynamically against the system
+packages and the binary runs in place — no deploy step.
