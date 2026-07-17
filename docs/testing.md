@@ -100,3 +100,36 @@ Unset it (`Remove-Item Env:HLM_STAT_DELAY_MS`) for normal behavior.
   Rows re-order live as counts arrive ("…" and "?" sort below real counts).
 - [x] **Disconnect mid-fill:** disconnect while a big directory is filling.
   No crash, no errors beyond the normal disconnect; reconnecting works.
+
+## Milestone 4
+
+Selection + Hard Link dialog + link execution. **Use throwaway copies of files
+in a test directory** — the run replaces file contents by design.
+
+- [x] **Link enablement:** the Link button is disabled with 0 or 1 files
+  selected, enabled at 2+, and folders don't count (a folder + one file stays
+  disabled). It disables again after navigation (selection clears) and on
+  disconnect.
+- [x] **Dialog basics:** with 2+ files selected, Link opens the dialog listing
+  each file's path, size / links / inode. "Hard Link" is disabled until a
+  primary radio is chosen. Cancel before running changes nothing on the share.
+- [x] **Happy path:** select two throwaway copies, pick a primary, run. The
+  victim's status walks through the steps to "replaced with hard link"; after
+  Close, the view refreshes and both names show the same inode and Links = 2;
+  the victim's content now matches the primary (check over the share).
+- [x] **Three files:** select three copies, keep one primary. Both victims are
+  replaced sequentially; Links shows 3 on all three names after refresh.
+- [x] **No leftover tmp:** after a successful run, no `*.hlmgr-tmp` files
+  remain in the directory.
+- [ ] **Link failure restores:** cause the link step to fail (e.g. make the
+  victim's folder read-only for the user, if possible). The status reports the
+  failure with "(original restored)", and the victim is back under its
+  original name with its original content.
+- [x] **Already-linked pair:** run the dialog on two names that are already
+  hard links of each other. No data is lost (the result is the same pair,
+  link count unchanged).
+- [x] **Disconnect mid-run:** with the stat throttle off but on a slower run
+  (several victims), disconnect mid-sequence if you can catch it. Remaining
+  steps fail with "Disconnected.", no crash; check the share for a stranded
+  `*.hlmgr-tmp` and restore it manually if present (this is the documented
+  cost of aborting mid-sequence).

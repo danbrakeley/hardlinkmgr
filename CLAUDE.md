@@ -20,8 +20,13 @@ order), and `src/ui/FileBrowserView` (path box, filter, matches/total label).
 Milestone 3 added the lazy link-count fill-in: `SmbSession::statFile` (pipelined
 `smb2_stat_async`) driven by a bounded stat pump in `FileBrowserView`
 (`kMaxStatsInFlight`, visible rows first, navigation drops the unsent backlog
-and orphans in-flight replies by clearing the path→row map). Milestones 4+
-(link dialog, multi-view) are not yet implemented.
+and orphans in-flight replies by clearing the path→row map). Milestone 4 added the
+link flow: `SmbSession` mutating ops (rename/link/unlink) with request-id
+completion signals that always fire asynchronously (queued even on immediate
+failure and on teardown-flush, so a handler never re-enters a context being
+destroyed), and `src/ui/HardLinkDialog` running the per-victim
+rename → link → unlink sequence with rename-back on link failure. Milestone 5+
+(multi-view, polish) and milestone 6 (Linux build) remain.
 Gotcha discovered in milestone 2: `smb2_destroy_context` flushes pending
 callbacks with `SMB2_STATUS_SHUTDOWN`, so SmbSession callbacks must check
 `m_inTeardown` and only release resources on that path.

@@ -89,6 +89,14 @@ public:
     // statFailed(); many stats can be in flight at once (pipelined PDUs).
     void statFile(const QString &path);
 
+    // Mutating operations, used by the Hard Link dialog to chain its
+    // rename -> link -> unlink sequence. Each returns a request id; completion
+    // arrives as operationSucceeded(id) or operationFailed(id, message) —
+    // always asynchronously, even for immediate failures.
+    quint64 renameFile(const QString &fromPath, const QString &toPath);
+    quint64 createHardLink(const QString &existingPath, const QString &newLinkPath);
+    quint64 removeFile(const QString &path);
+
 signals:
     void stateChanged(SmbSession::State state);
     void errorOccurred(const QString &message);
@@ -96,10 +104,13 @@ signals:
     void directoryListFailed(const QString &path, const QString &message);
     void fileStatted(const QString &path, int nlink, quint64 inode);
     void statFailed(const QString &path, const QString &message);
+    void operationSucceeded(quint64 id);
+    void operationFailed(quint64 id, const QString &message);
 
 private:
     struct ListRequest;
     struct StatRequest;
+    struct OpRequest;
 
     static void onConnectDone(struct smb2_context *ctx, int status,
                               void *commandData, void *privateData);
@@ -107,10 +118,14 @@ private:
                               void *commandData, void *privateData);
     static void onStatDone(struct smb2_context *ctx, int status,
                            void *commandData, void *privateData);
+    static void onOpDone(struct smb2_context *ctx, int status,
+                         void *commandData, void *privateData);
 
     void onHostResolved(const QHostInfo &info);
     void startSmbConnect(const QString &server);
     void statFileNow(const QString &path);
+    quint64 failOpLater(const QString &message); // allocates an id, queues its failure
+    OpRequest *newOpRequest();
     void service(int revents);
     void syncNotifiersToContext();
     void teardown();
@@ -131,4 +146,6 @@ private:
     QString m_pendingError;
     QSet<ListRequest *> m_pendingLists;
     QSet<StatRequest *> m_pendingStats;
+    QSet<OpRequest *> m_pendingOps;
+    quint64 m_nextOpId = 1;
 };

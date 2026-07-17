@@ -26,6 +26,16 @@ constexpr int kTickIntervalMs = 250;
 // (The TCP phase is bounded by the OS; the user can always Abort.)
 constexpr int kPduTimeoutSeconds = 15;
 
+// libsmb2 takes share-relative paths with no leading slash ("" = root).
+QByteArray toSmbPath(const QString &path)
+{
+    QString p = path;
+    while (p.startsWith(QLatin1Char('/'))) {
+        p.remove(0, 1);
+    }
+    return p.toUtf8();
+}
+
 } // namespace
 
 // cb_data for an in-flight opendir; owned by m_pendingLists until its
@@ -42,6 +52,13 @@ struct SmbSession::StatRequest
     SmbSession *session;
     QString path;
     struct smb2_stat_64 st;
+};
+
+// cb_data for an in-flight mutating operation (rename/link/unlink).
+struct SmbSession::OpRequest
+{
+    SmbSession *session;
+    quint64 id;
 };
 
 std::optional<SmbShareSpec> SmbShareSpec::fromUrl(const QUrl &url, QString *errorMessage)
@@ -236,14 +253,8 @@ void SmbSession::listDirectory(const QString &path)
         return;
     }
 
-    // libsmb2 takes share-relative paths with no leading slash ("" = root).
-    QString smbPath = path;
-    while (smbPath.startsWith(QLatin1Char('/'))) {
-        smbPath.remove(0, 1);
-    }
-
     auto *request = new ListRequest{this, path};
-    if (smb2_opendir_async(m_ctx, smbPath.toUtf8().constData(),
+    if (smb2_opendir_async(m_ctx, toSmbPath(path).constData(),
                            &SmbSession::onOpendirDone, request) != 0) {
         delete request;
         emit directoryListFailed(path, tr("Could not list %1: %2")
@@ -325,13 +336,8 @@ void SmbSession::statFileNow(const QString &path)
         return;
     }
 
-    QString smbPath = path;
-    while (smbPath.startsWith(QLatin1Char('/'))) {
-        smbPath.remove(0, 1);
-    }
-
     auto *request = new StatRequest{this, path, {}};
-    if (smb2_stat_async(m_ctx, smbPath.toUtf8().constData(), &request->st,
+    if (smb2_stat_async(m_ctx, toSmbPath(path).constData(), &request->st,
                         &SmbSession::onStatDone, request) != 0) {
         const QString detail = QString::fromUtf8(smb2_get_error(m_ctx));
         delete request;
@@ -366,6 +372,116 @@ void SmbSession::onStatDone(struct smb2_context *ctx, int status,
     }
 
     emit self->fileStatted(path, int(st.smb2_nlink), st.smb2_ino);
+}
+
+// The mutating operations always report completion asynchronously — even
+// immediate failures — so callers can store the returned id before any
+// operationSucceeded/operationFailed for it can arrive.
+
+quint64 SmbSession::failOpLater(const QString &message)
+{
+    const quint64 id = m_nextOpId++;
+    QMetaObject::invokeMethod(this, [this, id, message] {
+        emit operationFailed(id, message);
+    }, Qt::QueuedConnection);
+    return id;
+}
+
+SmbSession::OpRequest *SmbSession::newOpRequest()
+{
+    auto *request = new OpRequest{this, m_nextOpId++};
+    m_pendingOps.insert(request);
+    return request;
+}
+
+quint64 SmbSession::renameFile(const QString &fromPath, const QString &toPath)
+{
+    if (m_state != State::Connected) {
+        return failOpLater(tr("Not connected."));
+    }
+    OpRequest *request = newOpRequest();
+    const quint64 id = request->id;
+    if (smb2_rename_async(m_ctx, toSmbPath(fromPath).constData(),
+                          toSmbPath(toPath).constData(),
+                          &SmbSession::onOpDone, request) != 0) {
+        const QString detail = QString::fromUtf8(smb2_get_error(m_ctx));
+        m_pendingOps.remove(request);
+        delete request;
+        return failOpLater(detail);
+    }
+    syncNotifiersToContext();
+    return id;
+}
+
+quint64 SmbSession::createHardLink(const QString &existingPath, const QString &newLinkPath)
+{
+    if (m_state != State::Connected) {
+        return failOpLater(tr("Not connected."));
+    }
+    OpRequest *request = newOpRequest();
+    const quint64 id = request->id;
+    // smb2_link is our fork's patch (see ADR 0001 / spikes/01_libsmb2); it
+    // fails if newLinkPath already exists, which the dialog's rename-aside
+    // sequence guarantees it doesn't.
+    if (smb2_link_async(m_ctx, toSmbPath(existingPath).constData(),
+                        toSmbPath(newLinkPath).constData(),
+                        &SmbSession::onOpDone, request) != 0) {
+        const QString detail = QString::fromUtf8(smb2_get_error(m_ctx));
+        m_pendingOps.remove(request);
+        delete request;
+        return failOpLater(detail);
+    }
+    syncNotifiersToContext();
+    return id;
+}
+
+quint64 SmbSession::removeFile(const QString &path)
+{
+    if (m_state != State::Connected) {
+        return failOpLater(tr("Not connected."));
+    }
+    OpRequest *request = newOpRequest();
+    const quint64 id = request->id;
+    if (smb2_unlink_async(m_ctx, toSmbPath(path).constData(),
+                          &SmbSession::onOpDone, request) != 0) {
+        const QString detail = QString::fromUtf8(smb2_get_error(m_ctx));
+        m_pendingOps.remove(request);
+        delete request;
+        return failOpLater(detail);
+    }
+    syncNotifiersToContext();
+    return id;
+}
+
+void SmbSession::onOpDone(struct smb2_context *ctx, int status,
+                          void * /*commandData*/, void *privateData)
+{
+    auto *request = static_cast<OpRequest *>(privateData);
+    SmbSession *self = request->session;
+    const quint64 id = request->id;
+    self->m_pendingOps.remove(request);
+    delete request;
+
+    if (self->m_inTeardown) {
+        // Emitting here would let a handler start the next operation against
+        // the context that is mid-destruction; queue the failure instead so
+        // it lands after teardown, when the state guards reject follow-ups.
+        QMetaObject::invokeMethod(self, [self, id] {
+            emit self->operationFailed(id, tr("Disconnected."));
+        }, Qt::QueuedConnection);
+        return;
+    }
+
+    if (status != 0) {
+        QString detail = QString::fromUtf8(smb2_get_error(ctx));
+        if (detail.isEmpty()) {
+            detail = QString::fromLocal8Bit(std::strerror(-status));
+        }
+        emit self->operationFailed(id, detail);
+        return;
+    }
+
+    emit self->operationSucceeded(id);
 }
 
 void SmbSession::onConnectDone(struct smb2_context *ctx, int status,
@@ -485,6 +601,8 @@ void SmbSession::teardown()
     m_pendingLists.clear();
     qDeleteAll(m_pendingStats);
     m_pendingStats.clear();
+    qDeleteAll(m_pendingOps);
+    m_pendingOps.clear();
 }
 
 void SmbSession::setState(State state)

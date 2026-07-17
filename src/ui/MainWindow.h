@@ -22,6 +22,8 @@ public:
 
 private:
     void onConnectActionTriggered();
+    void onLinkActionTriggered();
+    void updateLinkAction();
     void onSessionStateChanged(SmbSession::State state);
     void onSessionError(const QString &message);
     void advanceSpinner();

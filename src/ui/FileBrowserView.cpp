@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QItemSelectionModel>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
@@ -108,6 +109,8 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     m_tree->sortByColumn(FileListModel::NameColumn, Qt::AscendingOrder);
     connect(m_tree, &QTreeView::activated,
             this, &FileBrowserView::onEntryActivated);
+    connect(m_tree->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, [this] { emit selectionChanged(); });
 
     QHeaderView *header = m_tree->header();
     header->setStretchLastSection(false);
@@ -146,9 +149,24 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     updateCountLabel();
 }
 
-QItemSelectionModel *FileBrowserView::selectionModel() const
+QList<SelectedFile> FileBrowserView::selectedFiles() const
 {
-    return m_tree->selectionModel();
+    QList<SelectedFile> files;
+    const QModelIndexList rows = m_tree->selectionModel()->selectedRows();
+    for (const QModelIndex &proxyIndex : rows) {
+        const FileEntry &entry = m_model->entryAt(m_proxy->mapToSource(proxyIndex).row());
+        if (!entry.isDir) {
+            files.append({entryPath(entry.name), entry});
+        }
+    }
+    return files;
+}
+
+void FileBrowserView::refresh()
+{
+    if (!m_currentPath.isEmpty()) {
+        navigateTo(m_currentPath);
+    }
 }
 
 void FileBrowserView::navigateTo(const QString &path)
@@ -187,6 +205,9 @@ void FileBrowserView::onDirectoryListed(const QString &path, const QList<FileEnt
     m_model->setEntries(entries);
     updateCountLabel();
     resetStatQueue();
+    // The model reset cleared the selection without a selectionChanged signal
+    // (QItemSelectionModel::reset is documented not to emit); tell listeners.
+    emit selectionChanged();
 }
 
 void FileBrowserView::onDirectoryListFailed(const QString &path, const QString &message)

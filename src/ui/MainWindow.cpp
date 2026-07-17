@@ -1,12 +1,14 @@
 #include "MainWindow.h"
 
 #include "ui/FileBrowserView.h"
+#include "ui/HardLinkDialog.h"
 
 #include <QAction>
 #include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
+#include <QSet>
 #include <QStatusBar>
 #include <QStyle>
 #include <QTimer>
@@ -46,8 +48,10 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolBar->addSeparator();
 
     m_linkAction = m_toolBar->addAction(tr("Link"));
-    m_linkAction->setEnabled(false); // enabled by cross-view selection logic in milestone 4
+    m_linkAction->setEnabled(false); // needs >=2 files selected across the views
     m_linkAction->setToolTip(tr("Replace selected files with hard links (select at least two files)"));
+    connect(m_linkAction, &QAction::triggered,
+            this, &MainWindow::onLinkActionTriggered);
 
     m_spinnerTimer = new QTimer(this);
     m_spinnerTimer->setInterval(80);
@@ -134,11 +138,54 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         m_browser = new FileBrowserView(m_session, this);
         connect(m_browser, &FileBrowserView::errorOccurred,
                 this, &MainWindow::onSessionError);
+        connect(m_browser, &FileBrowserView::selectionChanged,
+                this, &MainWindow::updateLinkAction);
         setCentralWidget(m_browser); // deletes the placeholder label
         m_centralLabel = nullptr;
         m_browser->navigateTo(QStringLiteral("/"));
         statusBar()->showMessage(tr("Connected to %1.").arg(m_shareDisplayName));
         break;
+    }
+    updateLinkAction();
+}
+
+// "Link" needs at least two distinct files selected across all views.
+void MainWindow::updateLinkAction()
+{
+    int count = 0;
+    if (m_session->state() == SmbSession::State::Connected && m_browser) {
+        QSet<QString> paths;
+        for (const SelectedFile &file : m_browser->selectedFiles()) {
+            paths.insert(file.path);
+        }
+        count = paths.size();
+    }
+    m_linkAction->setEnabled(count >= 2);
+}
+
+void MainWindow::onLinkActionTriggered()
+{
+    if (!m_browser) {
+        return;
+    }
+    // Gather across all views, dropping duplicate paths (the same file can be
+    // selected in more than one view once milestone 5 adds them).
+    QList<SelectedFile> files;
+    QSet<QString> seen;
+    for (const SelectedFile &file : m_browser->selectedFiles()) {
+        if (!seen.contains(file.path)) {
+            seen.insert(file.path);
+            files.append(file);
+        }
+    }
+    if (files.size() < 2) {
+        return;
+    }
+
+    HardLinkDialog dialog(m_session, files, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        // A run happened (even a partly failed one changes the share).
+        m_browser->refresh();
     }
 }
 

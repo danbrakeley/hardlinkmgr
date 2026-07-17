@@ -55,6 +55,8 @@ qt_add_executable(hardlinkmgr
   src/smb/SmbTypes.h
   src/ui/FileBrowserView.cpp
   src/ui/FileBrowserView.h
+  src/ui/HardLinkDialog.cpp
+  src/ui/HardLinkDialog.h
   src/ui/MainWindow.cpp
   src/ui/MainWindow.h
 )

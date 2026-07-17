@@ -17,6 +17,13 @@ class FileFilterProxyModel;
 class FileListModel;
 class SmbSession;
 
+// A file selected in a view, with the metadata the Hard Link dialog shows.
+struct SelectedFile
+{
+    QString path; // share-absolute
+    FileEntry entry;
+};
+
 // One filesystem view (README): path box, case-insensitive filter box,
 // "matches / total" label, and the file table. The full listing stays in
 // memory; the proxy decides what is shown.
@@ -28,12 +35,16 @@ public:
     explicit FileBrowserView(SmbSession *session, QWidget *parent = nullptr);
 
     void navigateTo(const QString &path);
+    void refresh(); // re-lists the current path (e.g. after linking)
 
-    // For milestone 4's "Link enabled when >=2 files selected" logic.
-    QItemSelectionModel *selectionModel() const;
+    QString currentPath() const { return m_currentPath; }
+
+    // The files (never folders) currently selected in this view.
+    QList<SelectedFile> selectedFiles() const;
 
 signals:
     void errorOccurred(const QString &message); // surfaced in the main status bar
+    void selectionChanged(); // fires on user selection and on listing changes
 
 private:
     void onPathEdited();
