@@ -1,63 +1,161 @@
-# Roadmap (or just a list of ideas to explore)
+# Roadmap <!-- omit in toc -->
 
-## Tree view inside the table
+- [Overview of Problems](#overview-of-problems)
+- [Improve finding matches](#improve-finding-matches)
+  - [Tree view inside the table](#tree-view-inside-the-table)
+- [Keep log/history of actions/errors](#keep-loghistory-of-actionserrors)
+- [Link button is confusing](#link-button-is-confusing)
+- [More general file management](#more-general-file-management)
+- [Do we need menus? Why?](#do-we-need-menus-why)
+- [Move counts from toolbar to status bar](#move-counts-from-toolbar-to-status-bar)
 
-When viewing a folder that contains a long list of folders, but each folder only contains 2 files, it would be great to expand all the folders in the same table.
+## Overview of Problems
 
-## Copy filters across views
+Pri: 1 (highest) to 5 (lowest)
 
-- Button to quickly copy the filter from the view above it
-- Toggle to keep filters in sync with the view above it
+| Pri | Name                                   | Notes                                                        |
+| --- | -------------------------------------- | ------------------------------------------------------------ |
+| 1   | Improve finding matches                |                                                              |
+| 2   | Keep log/history of actions/errors     | Could be useful for debugging                                |
+| 3   | Build/release workflows                | right now I just build an EXE by hand, no releases           |
+| 4   | Link button is confusing               | is it?                                                       |
+| 5   | App Icon                               | Right now we have a generic app icon that looks ... generic. |
+| 5   | Do we need menus?                      | Why or why not?                                              |
+| 5   | More general file management           | ie rename/delete... need specific use case first             |
+| 5   | Move counts from toolbar to status bar | UX cleanup, but would free up toolbar space if needed        |
+| 5   | Parent folder icon doesn't read well   | Doesn't read as having to do with folder navigation          |
+| 5   | Toolbar toggle buttons don't read well | Toggle-ability and current state not obvious                 |
 
-## Filter by size of file selected in previous view
+## Improve finding matches
 
-- Ensure what you see in view 2 is within X bytes of what is selected in view 1.
-  - If multiple things are selected in view 1, create two byte ranges centered on each selected file.
+The process of matching a file in the top view with potential matches in the bottom view needs to be faster.
 
-## View Toolbar improvements
+Currently, my work flow involves:
 
-- Better "parent folder" icon
-  - The up caret is hard to even see, let alone know it does at a glance.
-- Better toolbar grouping/layout
-  - Filter buttons should be grouped more obviously
-- Toggle button "on" state should be more obvious
+- knowing that the originals are in Folder A and the potential duplicates are in Folder B
+- identifying a potential candidate in Folder A
+  - candidate is: has only 1 hard link (indicating it is not already de-duplicated), and a large file whose file extension indicates it is media file
+  - candidates are generally not found in Folder A itself, but nested in children of Folder A
+- looking for a match in Folder B
+  - identify core name from original file and use that as filter
+  - duplicates are not in the root of Folder B, but in sub folders of sub folders
+  - match is often BUT NOT ALWAYS the exact same size
+    - when bytes don't match, they are very close
+    - should gather examples and come up with a rule of thumb, maybe a fixed number of bytes? or percentage of total size?
 
-## Main Window Toolbar improvements
+Solution Ideas:
 
-- connect/disconnect doesn't need text
-- connect/disconnect should be to left of connection string
-- "Link" button is confusing: "Link Selected Files"? <-- too verbose?
+- Still mostly manual:
+  - View nested folders in the same view, with same filters ("Tree view inside the table" below)
+  - Sync filter strings across views
+  - Add filter for exact size, but also size range
+    - View 2 could show files within X% of the size of selected file in view 1?
 
-## Log all actions
+- Generate a list of potential matches, then manually go through list, accepted or rejecting them.
+  - Do a first pass to generate a list of potential matches
+    - List shows up independent of file view(s)
+  - Selecting a row in that list finds the original files in file views (adds views as needed)
+
+- Completely automated
+  - REJECTED: doesn't solve original problem, in the same way jdupes doesn't.
+
+### Tree view inside the table
+
+Right now the views of the files in on the SMB share are a list of files/folders in a single folder (nothing from the parent or the child folders are included), viewed in table form.
+
+I want to be able to see the child files/folders in each visible folder (depth of 1 to start, maybe configurable in the future), in a sort of tree view inside the same list.
+
+```text
+
+What we currently have:
+
++---------------------------------------------------------------------+
+| ^ | /path/to/current/folder           | @@ | Aa | Filter    | # | X |
++---------------------------------------------------------------------+
+|   | Name                          | Size | Modified | Links | Inode |
+| I | Folder A                      | #    | {date}   | #     | #     |
+| I | Folder B                      | #    | {date}   | #     | #     |
+| I | Folder C                      | #    | {date}   | #     | #     |
+|   | File D                        | #    | {date}   | #     | #     |
++---------------------------------------------------------------------+
+
+What I'm thinking:
+
+1. Folders all start collapsed:
+
++---------------------------------------------------------------------+
+| ^ | /path/to/current/folder           | @@ | Aa | Filter    | # | X |
++---------------------------------------------------------------------+
+|   |+/-| Name                      | Size | Modified | Links | Inode |
+| I | + | Folder A                  | #    | {date}   | #     | #     |
+| I | + | Folder B                  | #    | {date}   | #     | #     |
+| I | + | Folder C                  | #    | {date}   | #     | #     |
+|   |   | File D                    | #    | {date}   | #     | #     |
++---------------------------------------------------------------------+
+
+2. Folders can be expanded:
+
++---------------------------------------------------------------------+
+| ^ | /path/to/current/folder           | @@ | Aa | Filter    | # | X |
++---------------------------------------------------------------------+
+|   |+/-| Name                      | Size | Modified | Links | Inode |
+| I | - | Folder A                  | #    | {date}   | #     | #     |
+|   |   | ↳ File AA                 | #    | {date}   | #     | #     |
+|   |   | ↳ File AB                 | #    | {date}   | #     | #     |
+| I | - | Folder B                  | #    | {date}   | #     | #     |
+|   | + | ↳ Folder BA               | #    | {date}   | #     | #     |
+|   |   | ↳ File BB                 | #    | {date}   | #     | #     |
+| I | - | Folder C                  | #    | {date}   | #     | #     |
+| I |   | ↳ Folder CA               | #    | {date}   | #     | #     |
+|   |   | ↳ File CB                 | #    | {date}   | #     | #     |
+|   |   | File D                    | #    | {date}   | #     | #     |
++---------------------------------------------------------------------+
+
+```
+
+The new column between the Icon and Name columns will have "+" buttons to allow the user to expand that folder, and "-" buttons on expanded folders to collapse.
+
+File/folder data will need to be retrieved, ideally asynchronously, so some kind of placeholder or spinner will be needed to be in place while that work is happening. And changing the top level path of the view should cancel all outstanding async work.
+
+## Keep log/history of actions/errors
 
 - keep a log file
+- every file action is slogged
 - add a log viewer inside the app (in the Help menu?)
 
-## Other useful actions
+## Link button is confusing
 
-- Delete file/folder?
-- Rename file/folder?
+- "Link" button is confusing: "Link Selected Files"? <-- too verbose?
 
-## Menus?
+## More general file management
 
-- File
-  - Connect <-- grayed out if connected
-  - Disconnect <-- grayed out if not connected
-  - ---
-  - Exit
-- Edit
-  - Link Selected Files
-  - Unlink Selected Files <-- grayed out unless selection is >2 files with identical inode)
-- View
-  - Expand all folders in selected view
-  - Collapse all folders in selected view
-- Help
-  - View Logs
-  - ---
-  - See project in GitHub
-  - ---
-  - About
+- Create new hard link to existing file
+- Delete file/folder
+- Rename file/folder
 
-## App icon
+## Do we need menus? Why?
 
-Need one
+- Unclear if we need them. What would they provide that we don't already have?
+- What kind of expectations are there on macOS?
+
+## Move counts from toolbar to status bar
+
+- Move Total/Filtered counts from toolbar to a new status bar
+- Use columns in the status bar
+- Add count of selected items in this view
+
+```text
+
++---------------------------------------------------------------------+
+| ^ | /path/to/current/folder           | @@ | Aa | Filter        | X |
++---------------------------------------------------------------------+
+|   | Name                          | Size | Modified | Links | Inode |
+| I | Folder A                      | #    | {date}   | #     | #     |
+| I | Folder B                      | #    | {date}   | #     | #     |
+| I | Folder C                      | #    | {date}   | #     | #     |
+|   | File D                        | #    | {date}   | #     | #     |
++---------------------------------------------------------------------+
+|                               | Selected: 0 | Visible: 4 | Total: 4 |   <-- new status bar
++---------------------------------------------------------------------+
+
+```

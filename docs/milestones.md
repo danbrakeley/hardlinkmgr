@@ -1,6 +1,6 @@
-# Initial POC Milestones
+# Milestones
 
-Completed: 2026-07-17
+## Initial POC - Completed 2026-07-17
 
 Each milestone is independently verifiable against the real share.
 
