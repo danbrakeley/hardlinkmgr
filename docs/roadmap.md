@@ -2,7 +2,8 @@
 
 - [Overview of Problems](#overview-of-problems)
 - [Improve finding matches](#improve-finding-matches)
-  - [Tree view inside the table](#tree-view-inside-the-table)
+  - [Generate a list of potential matches: the Search and Search Results UI](#generate-a-list-of-potential-matches-the-search-and-search-results-ui)
+  - [**SHELVED FOR NOW** Tree view inside the table](#shelved-for-now-tree-view-inside-the-table)
 - [Keep log/history of actions/errors](#keep-loghistory-of-actionserrors)
 - [Link button is confusing](#link-button-is-confusing)
 - [More general file management](#more-general-file-management)
@@ -51,7 +52,7 @@ Solution Ideas:
   - Add filter for exact size, but also size range
     - View 2 could show files within X% of the size of selected file in view 1?
 
-- Generate a list of potential matches, then manually go through list, accepted or rejecting them.
+- Generate a list of potential matches, then manually go through list, accepting or rejecting them.
   - Do a first pass to generate a list of potential matches
     - List shows up independent of file view(s)
   - Selecting a row in that list finds the original files in file views (adds views as needed)
@@ -59,7 +60,48 @@ Solution Ideas:
 - Completely automated
   - REJECTED: doesn't solve original problem, in the same way jdupes doesn't.
 
-### Tree view inside the table
+### Generate a list of potential matches: the Search and Search Results UI
+
+The main window currently has 1 or more views, stacked vertically on top of each other. I propose that all of that becomes the left side of the main window, and the right side becomes the following:
+
+```text
+
++--------------------------------------------------+
+| Search for Matches:                              |
+|                                                  |
+| Name:                                            |
+|  O Fuzzy                                         |  <-- TODO: what options exist here? Assume media files, where one version is just the media name, and the other includes the name, codecs, resolution, and other tags
+|  O Must contain: [ text string ]                 |
+|  O Ignore name                                   |
+|                                                  |
+| Size:                                            |
+|  O Exact matches only                            |
+|  O Within: [ number input ]↕ [units dropdown]    |  <-- units dropdown has options for "bytes", "KiB", "MiB", "GiB"
+|  O Ignore size                                   |
+|                                                  |
+| Date:                                            |
+|  O Exact matches only                            |
+|  O Within: [ number input ]↕ [units dropdown]    |  <-- units dropdown has options for "seconds", "minutes", "hours", "days"
+|  O Ignore date                                   |  <-- default selection
+|                                                  |
+|                                   [START/CANCEL] |
++--------------------------------------------------|
+| Search Results                                   |
+|                                                  |
+| ...list of potential matches in a table...       |  <-- description of table below...
+| ...                                              |
+| ...                                              |
+| ...                                              |
+|                                                  |
++--------------------------------------------------|
+
+```
+
+- Search Results table
+  - each row has one match
+  - columns include full path of each file in the match, file sizes, dates, and link counts
+
+### **SHELVED FOR NOW** Tree view inside the table
 
 Right now the views of the files in on the SMB share are a list of files/folders in a single folder (nothing from the parent or the child folders are included), viewed in table form.
 
