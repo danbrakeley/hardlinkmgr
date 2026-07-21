@@ -6,6 +6,7 @@
 #include "smb/SmbSession.h"
 
 class QAction;
+class QCloseEvent;
 class QLabel;
 class QLineEdit;
 class QSplitter;
@@ -21,7 +22,11 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private:
+    void restoreWindowGeometry();
     void onConnectActionTriggered();
     void onLinkActionTriggered();
     void updateLinkAction();

@@ -4,10 +4,13 @@
 #include "ui/HardLinkDialog.h"
 
 #include <QAction>
+#include <QCloseEvent>
+#include <QGuiApplication>
 #include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
+#include <QScreen>
 #include <QSet>
 #include <QSettings>
 #include <QSplitter>
@@ -70,7 +73,48 @@ MainWindow::MainWindow(QWidget *parent)
 
     statusBar(); // create it up front so messages have somewhere to go
     onSessionStateChanged(SmbSession::State::Disconnected); // creates the placeholder
-    resize(900, 600);
+    restoreWindowGeometry();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    QSettings().setValue(QStringLiteral("window/geometry"), saveGeometry());
+    QMainWindow::closeEvent(event);
+}
+
+// Restores the last saved size/position, but only if enough of the title bar
+// would land on a currently-connected screen for the user to grab and drag it
+// back — otherwise a monitor that's since been unplugged (undocked laptop,
+// changed RDP resolution, ...) would strand the window off-screen with no way
+// to reach it. Falls back to a centered default in that case.
+void MainWindow::restoreWindowGeometry()
+{
+    const QByteArray saved = QSettings().value(QStringLiteral("window/geometry")).toByteArray();
+    const QSize defaultSize(900, 600);
+
+    if (saved.isEmpty() || !restoreGeometry(saved)) {
+        resize(defaultSize);
+        return;
+    }
+
+    const int kMinVisiblePx = 60;
+    QRect titleStrip = frameGeometry();
+    titleStrip.setHeight(qMin(titleStrip.height(), kMinVisiblePx));
+
+    bool reachable = false;
+    for (const QScreen *screen : QGuiApplication::screens()) {
+        const QRect overlap = titleStrip.intersected(screen->availableGeometry());
+        if (overlap.width() >= kMinVisiblePx && overlap.height() >= kMinVisiblePx) {
+            reachable = true;
+            break;
+        }
+    }
+
+    if (!reachable) {
+        resize(defaultSize);
+        const QRect avail = QGuiApplication::primaryScreen()->availableGeometry();
+        move(avail.center() - QPoint(defaultSize.width() / 2, defaultSize.height() / 2));
+    }
 }
 
 void MainWindow::onConnectActionTriggered()
