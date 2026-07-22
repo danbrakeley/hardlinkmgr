@@ -64,39 +64,42 @@ Solution Ideas:
 
 The main window currently has 1 or more views, stacked vertically on top of each other.
 
-I want to change this to 2 or more views, and all the views are on the left side of a new splitter, and on the right side becomes an area for configuring, running, anb browsing the results of a recursive search for potential matches that we might want to link.
+I want to change this so that the views are on the left side of a new splitter, and on the right side becomes an area for configuring, running, and browsing the results of a recursive search for potential matches that we might want to link.
+
+The search algorithm should:
+
+- be focused on quickly finding potential matches, using only information that is easy to get, like file size, date, name, and inode information.
+- first gather file/folder info (recursively) for both the primary and secondary paths, trivially rejecting files that don't meet the options in the "Match Finder Options".
+- sort the gathered files by file size, and then look for pairs of files whose size difference is within the given "Size Difference" value
+- If two files are already linked to the same inode, then they are already linked, and are just not a potential match, and should not show up in the results
 
 In the following diagram:
 
-- `[ ]` is a checkbox with two states: "checked" aka "on", and "unchecked" aka "off")
-- `[ path/to/folder ]` is a text input that accepts a path; starts empty
-- `[ text string ]` is a text input that accepts any string (defaults to empty)
-- `[ number ]↕` is a numerical input box with up/down arrows on the right, and accepts only zero and positive integers (defaults to "0")
-- `<name match type>` is a dropdown that can be "Contains Literal", "Contains Wildcard (*)", and "Regular Expression" (defaults to "Contains Literal")
+- `[ ]` and `[x]` both represent a checkbox; `[x]` indicates it defaults to checked, and `[ ]` defaults to "unchecked"
+- `[path/to/folder]` is a text input that accepts a path; starts empty
+- `[number]↕` is a numerical input box with up/down arrows on the right, and accepts only zero and positive integers; starts at 0, unless otherwise noted in the diagram
 - `<byte units>` is a dropdown that can be "bytes", "KiB", "MiB", or "GiB" (defaults to "bytes")
-- `<time units>` is a dropdown that can be "seconds", "minutes", "hours", "days"
+- `[Start Search]` is a button that shows the text "Start Search" or "Cancel Search", depending on if a search is currently running or not
+- `[Link Selected Matches]` is a button that goes through the Match Results and attempts to replace the secondary file with a hard link to the primary file
 
 ```text
 +-------------------------------------------------------------------+
 | Match Finder Options:                                             |
 |                                                                   |
-|     Primary Path:   [ path/to/folder ]  [x] Sync  [x] Subfolders  |  <-- if Sync is checked, then the path in the text box follows the path the first view (on left of main window); typing in the text box unchecks Sync
-|     Secondary Path: [ path/to/folder ]  [x] Sync  [x] Subfolders  |  <-- if Sync is checked, then the path in the text box follows the path the first view (on left of main window); typing in the text box unchecks Sync
+|     Primary Path    [path/to/folder] [x] Include Subfolders       |
+|     Secondary Path  [path/to/folder] [x] Include Subfolders       |
+| [x] Size Min        [number]↕ <byte units>                        |  <-- defaults to 10 MiB
+| [x] Size Difference [number]↕ <byte units>                        |  <-- defaults to 0 MiB
 |                                                                   |
-| [ ] File Name: [ text string ] <name  match type>                 |  <-- this "[ ]" starts unchecked
-| [x] Size Difference: [ number ]↕ <byte units>                     |  <-- this "[ ]" starts CHECKED
-| [ ] Date Difference: [ number ]↕ <time units>                     |  <-- this "[ ]" starts unchecked
-| [x] Hard links: Min [ number ]↕, Max [ number ]↕                  |  <-- this "[ ]" starts CHECKED, and Min defaults to 0, and Max defaults to 1
-|                                                                   |
-| [ Reset All ]                                  [Start Search]     |  <-- "Reset All" returns all the above options back to their default states, and is grayed out if they are already in the default state; ""Start Search" button changes to "Cancel Search" while a search is running
+|                                                  [Start Search]   |  <-- "Start Search" button changes to "Cancel Search" while a search is running
 +-------------------------------------------------------------------|
 | Match Finder Results                                              |
 |                                                                   |
-| [ ] | Primary Name    | Secondary Name        | Other Names?      |  <-- this is the header row, and the "[ ]" will check/uncheck all items in the list
-| [ ] | File AB.iso     | Also File AB.iso      |                   |  <-- this row begins the results, one result per row
-| [ ] | File 321.iso    | Also File 321.iso     | File 32b.iso, ... |
+| [ ] | Primary Name          | Secondary Name                      |  <-- this is the header row in the table of results, and the "[ ]" will check/uncheck all items in the list
+| [ ] | File AB.iso           | This is a copy of File AB.iso       |  <-- this row begins the results, one result per row
+| [ ] | File 321.iso          | This is a hard link to File 321.iso |
 |                                                                   |
-|                                       [ Link Selected Matches ]   |
+|                                         [Link Selected Matches]   |
 +-------------------------------------------------------------------|
 ```
 
@@ -105,8 +108,9 @@ In the following diagram:
 
 - The table in "Match Finder Results" starts empty, and populates when a search completes.
 - Searching takes into account the options at the top while looking for potential matches.
+- Note that it is valid for Primary and Secondary paths to overlap or be the same.
 
-- Once there are search results:
+- Once there are search results in the table:
   - Selecting a table row should cause the relevant Views to navigate to the appropriate folder and select/show the appropriate file.
   - Each result row has a checkbox in the first column that starts unchecked.
   - "Link Selected Matches" is only enabled when 1 or more rows are checked.
