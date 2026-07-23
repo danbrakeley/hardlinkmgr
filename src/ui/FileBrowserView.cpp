@@ -1,6 +1,5 @@
 #include "FileBrowserView.h"
 
-#include <QDir>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QItemSelectionModel>
@@ -37,6 +36,7 @@ QIcon makeCaseSensitivityIcon(QFont font, const QPalette &palette)
 
 } // namespace
 
+#include "core/PathUtil.h"
 #include "models/FileFilterProxyModel.h"
 #include "models/FileListModel.h"
 #include "smb/SmbSession.h"
@@ -185,10 +185,22 @@ void FileBrowserView::setClosable(bool closable)
 
 void FileBrowserView::navigateTo(const QString &path)
 {
-    const QString normalized = normalizePath(path);
+    const QString normalized = pathutil::normalize(path);
+    m_pendingReveal.clear(); // only navigateToAndReveal carries a selection over
     m_pendingPath = normalized;
     m_pathEdit->setText(normalized);
     m_session->listDirectory(normalized);
+}
+
+void FileBrowserView::navigateToAndReveal(const QString &folderPath, const QString &fileName)
+{
+    const QString normalized = pathutil::normalize(folderPath);
+    if (normalized == m_currentPath && m_pendingPath.isEmpty()) {
+        revealByName(fileName);
+        return;
+    }
+    navigateTo(normalized);
+    m_pendingReveal = fileName;
 }
 
 void FileBrowserView::onPathEdited()
@@ -219,6 +231,10 @@ void FileBrowserView::onDirectoryListed(const QString &path, const QList<FileEnt
     m_model->setEntries(entries);
     updateCountLabel();
     resetStatQueue();
+    if (!m_pendingReveal.isEmpty()) {
+        revealByName(m_pendingReveal);
+        m_pendingReveal.clear();
+    }
     // The model reset cleared the selection without a selectionChanged signal
     // (QItemSelectionModel::reset is documented not to emit); tell listeners.
     emit selectionChanged();
@@ -230,6 +246,7 @@ void FileBrowserView::onDirectoryListFailed(const QString &path, const QString &
         return;
     }
     m_pendingPath.clear();
+    m_pendingReveal.clear();
     // Keep showing the last good listing; put its path back in the box.
     m_pathEdit->setText(m_currentPath.isEmpty() ? QStringLiteral("/") : m_currentPath);
     emit errorOccurred(message);
@@ -265,9 +282,31 @@ void FileBrowserView::onStatFailed(const QString &path, const QString &message)
 
 QString FileBrowserView::entryPath(const QString &name) const
 {
-    return m_currentPath == QLatin1String("/")
-               ? QLatin1Char('/') + name
-               : m_currentPath + QLatin1Char('/') + name;
+    return pathutil::join(m_currentPath, name);
+}
+
+// Selects and scrolls to the entry with the given name, clearing the filter
+// if it currently hides that entry. Silently does nothing if no entry matches
+// (e.g. the file was renamed since the search ran).
+void FileBrowserView::revealByName(const QString &fileName)
+{
+    for (int row = 0; row < m_model->rowCount(); ++row) {
+        if (m_model->entryAt(row).name != fileName) {
+            continue;
+        }
+        QModelIndex proxyIndex = m_proxy->mapFromSource(m_model->index(row, 0));
+        if (!proxyIndex.isValid()) {
+            m_filterEdit->clear();
+            proxyIndex = m_proxy->mapFromSource(m_model->index(row, 0));
+        }
+        if (proxyIndex.isValid()) {
+            m_tree->selectionModel()->setCurrentIndex(
+                proxyIndex,
+                QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            m_tree->scrollTo(proxyIndex, QAbstractItemView::PositionAtCenter);
+        }
+        return;
+    }
 }
 
 void FileBrowserView::resetStatQueue()
@@ -332,16 +371,4 @@ void FileBrowserView::updateCountLabel()
     m_countLabel->setText(m_filterEdit->text().isEmpty()
                               ? QString::number(total)
                               : tr("%1 / %2").arg(m_proxy->rowCount()).arg(total));
-}
-
-// Cleans up hand-typed paths: guarantees a leading '/', collapses "//", "."
-// and "..", drops trailing slashes.
-QString FileBrowserView::normalizePath(const QString &path)
-{
-    QString p = path.trimmed();
-    if (!p.startsWith(QLatin1Char('/'))) {
-        p.prepend(QLatin1Char('/'));
-    }
-    p = QDir::cleanPath(p);
-    return p.isEmpty() ? QStringLiteral("/") : p;
 }

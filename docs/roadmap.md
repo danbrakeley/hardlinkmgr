@@ -62,6 +62,9 @@ Solution Ideas:
 
 ### Generate a list of potential matches: the Search and Search Results UI
 
+**IMPLEMENTED** (2026-07-22): the Match Finder panel on the right side of the
+main window's new horizontal splitter. The design below is what was built.
+
 The main window currently has 1 or more views, stacked vertically on top of each other.
 
 I want to change this so that the views are on the left side of a new splitter, and on the right side becomes an area for configuring, running, and browsing the results of a recursive search for potential matches that we might want to link.
@@ -86,10 +89,10 @@ In the following diagram:
 +-------------------------------------------------------------------+
 | Match Finder Options:                                             |
 |                                                                   |
-|     Primary Path    [path/to/folder] [x] Include Subfolders       |
-|     Secondary Path  [path/to/folder] [x] Include Subfolders       |
-| [x] Size Min        [number]↕ <byte units>                        |  <-- defaults to 10 MiB
-| [x] Size Difference [number]↕ <byte units>                        |  <-- defaults to 0 MiB
+|   Primary Path    [path/to/folder] [x] Include Subfolders         |
+|   Secondary Path  [path/to/folder] [x] Include Subfolders         |
+|   Size Min        [number]↕ <byte units>                          |  <-- defaults to 10 MiB
+|   Size Difference [number]↕ <byte units>                          |  <-- defaults to 0 MiB;
 |                                                                   |
 |                                                  [Start Search]   |  <-- "Start Search" button changes to "Cancel Search" while a search is running
 +-------------------------------------------------------------------|

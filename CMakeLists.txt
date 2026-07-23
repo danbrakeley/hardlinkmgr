@@ -46,19 +46,30 @@ qt_standard_project_setup()
 
 qt_add_executable(hardlinkmgr
   src/main.cpp
+  src/core/LinkRunner.cpp
+  src/core/LinkRunner.h
+  src/core/MatchSearcher.cpp
+  src/core/MatchSearcher.h
+  src/core/PathUtil.h
   src/models/FileFilterProxyModel.cpp
   src/models/FileFilterProxyModel.h
   src/models/FileListModel.cpp
   src/models/FileListModel.h
+  src/models/MatchResultsModel.cpp
+  src/models/MatchResultsModel.h
   src/smb/SmbSession.cpp
   src/smb/SmbSession.h
   src/smb/SmbTypes.h
+  src/ui/CheckBoxHeader.cpp
+  src/ui/CheckBoxHeader.h
   src/ui/FileBrowserView.cpp
   src/ui/FileBrowserView.h
   src/ui/HardLinkDialog.cpp
   src/ui/HardLinkDialog.h
   src/ui/MainWindow.cpp
   src/ui/MainWindow.h
+  src/ui/MatchFinderPanel.cpp
+  src/ui/MatchFinderPanel.h
 )
 
 target_include_directories(hardlinkmgr PRIVATE src)

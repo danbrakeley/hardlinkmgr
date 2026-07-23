@@ -37,6 +37,10 @@ public:
     void navigateTo(const QString &path);
     void refresh(); // re-lists the current path (e.g. after linking)
 
+    // Navigates to folderPath (if not already there) and then selects and
+    // scrolls to fileName once the listing is in.
+    void navigateToAndReveal(const QString &folderPath, const QString &fileName);
+
     QString currentPath() const { return m_currentPath; }
 
     // The files (never folders) currently selected in this view.
@@ -60,11 +64,10 @@ private:
     void updateCountLabel();
 
     QString entryPath(const QString &name) const;
+    void revealByName(const QString &fileName);
     void resetStatQueue();
     void pumpStats();
     int nextStatRow();
-
-    static QString normalizePath(const QString &path);
 
     SmbSession *m_session = nullptr;
     FileListModel *m_model = nullptr;
@@ -77,8 +80,9 @@ private:
     QLineEdit *m_filterEdit = nullptr;
     QLabel *m_countLabel = nullptr;
     QToolButton *m_closeButton = nullptr;
-    QString m_currentPath;  // last successfully listed path
-    QString m_pendingPath;  // path of the in-flight listing, empty if none
+    QString m_currentPath;   // last successfully listed path
+    QString m_pendingPath;   // path of the in-flight listing, empty if none
+    QString m_pendingReveal; // file to select once the pending listing lands
 
     // Lazy link-count fill-in (milestone 3): a bounded number of stats is in
     // flight, visible rows are served first, and navigation resets everything

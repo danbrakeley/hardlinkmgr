@@ -2,6 +2,7 @@
 
 #include "ui/FileBrowserView.h"
 #include "ui/HardLinkDialog.h"
+#include "ui/MatchFinderPanel.h"
 
 #include <QAction>
 #include <QCloseEvent>
@@ -79,7 +80,16 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QSettings().setValue(QStringLiteral("window/geometry"), saveGeometry());
+    saveSplitterState();
     QMainWindow::closeEvent(event);
+}
+
+void MainWindow::saveSplitterState()
+{
+    if (m_hSplitter) {
+        QSettings().setValue(QStringLiteral("window/hsplitterState"),
+                             m_hSplitter->saveState());
+    }
 }
 
 // Restores the last saved size/position, but only if enough of the title bar
@@ -165,11 +175,14 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         m_connectAction->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
         m_urlEdit->setEnabled(true);
         if (!m_centralLabel) {
+            saveSplitterState();
             m_centralLabel = new QLabel(this);
             m_centralLabel->setAlignment(Qt::AlignCenter);
             m_centralLabel->setEnabled(false); // renders the placeholder text greyed out
-            setCentralWidget(m_centralLabel); // deletes the splitter and its views
+            setCentralWidget(m_centralLabel); // deletes the splitters, views, and panel
+            m_hSplitter = nullptr;
             m_splitter = nullptr;
+            m_matchPanel = nullptr;
             m_views.clear();
         }
         m_centralLabel->setText(tr("Not connected.\nEnter smb://user@host:port/share and press Connect."));
@@ -192,11 +205,37 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         m_connectAction->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
         m_urlEdit->setEnabled(false);
         QSettings().setValue(QStringLiteral("connect/lastUrl"), m_urlEdit->text().trimmed());
-        m_splitter = new QSplitter(Qt::Vertical, this);
+        m_hSplitter = new QSplitter(Qt::Horizontal, this);
+        m_hSplitter->setChildrenCollapsible(false);
+        m_splitter = new QSplitter(Qt::Vertical, m_hSplitter);
         m_splitter->setChildrenCollapsible(false);
-        setCentralWidget(m_splitter); // deletes the placeholder label
+        m_matchPanel = new MatchFinderPanel(m_session, m_hSplitter);
+        m_hSplitter->addWidget(m_splitter);
+        m_hSplitter->addWidget(m_matchPanel);
+        m_hSplitter->setStretchFactor(0, 2); // views get ~2/3 by default
+        m_hSplitter->setStretchFactor(1, 1);
+        connect(m_matchPanel, &MatchFinderPanel::revealRequested,
+                this, &MainWindow::onRevealRequested);
+        connect(m_matchPanel, &MatchFinderPanel::linkRunFinished, this, [this] {
+            // Same as after the Hard Link dialog: any view may be showing
+            // affected files or link counts.
+            for (FileBrowserView *view : std::as_const(m_views)) {
+                view->refresh();
+            }
+        });
+        connect(m_matchPanel, &MatchFinderPanel::statusMessage, this,
+                [this](const QString &message) { statusBar()->showMessage(message); });
+        setCentralWidget(m_hSplitter); // deletes the placeholder label
         m_centralLabel = nullptr;
+        {
+            const QByteArray state =
+                QSettings().value(QStringLiteral("window/hsplitterState")).toByteArray();
+            if (!state.isEmpty()) {
+                m_hSplitter->restoreState(state);
+            }
+        }
         addView();
+        m_matchPanel->beginPathValidation();
         statusBar()->showMessage(tr("Connected to %1.").arg(m_shareDisplayName));
         break;
     }
@@ -279,6 +318,21 @@ void MainWindow::onLinkActionTriggered()
             view->refresh();
         }
     }
+}
+
+// A Match Finder result row was selected: the first view shows the primary
+// file, the second shows the secondary (added if only one view is open).
+void MainWindow::onRevealRequested(const QString &primaryFolder, const QString &primaryName,
+                                   const QString &secondaryFolder, const QString &secondaryName)
+{
+    if (m_views.size() < 2) {
+        addView();
+    }
+    if (m_views.size() < 2) {
+        return; // not connected
+    }
+    m_views[0]->navigateToAndReveal(primaryFolder, primaryName);
+    m_views[1]->navigateToAndReveal(secondaryFolder, secondaryName);
 }
 
 // The session emits stateChanged(Disconnected) before errorOccurred(), so the

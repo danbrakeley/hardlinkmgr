@@ -9,7 +9,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
-#include "smb/SmbSession.h"
+#include "core/LinkRunner.h"
 
 namespace {
 
@@ -18,17 +18,16 @@ constexpr int kFileColumn = 1;
 constexpr int kInfoColumn = 2;
 constexpr int kStatusColumn = 3;
 
-const QLatin1String kTmpSuffix(".hlmgr-tmp");
-
 } // namespace
 
 HardLinkDialog::HardLinkDialog(SmbSession *session, const QList<SelectedFile> &files,
                                QWidget *parent)
     : QDialog(parent)
-    , m_session(session)
     , m_files(files)
 {
     setWindowTitle(tr("Create Hard Links"));
+
+    m_runner = new LinkRunner(session, this);
 
     auto *intro = new QLabel(
         tr("Choose the primary file to keep. Every other file below will be "
@@ -85,10 +84,14 @@ HardLinkDialog::HardLinkDialog(SmbSession *session, const QList<SelectedFile> &f
     layout->addWidget(m_list, /*stretch*/ 1);
     layout->addLayout(buttons);
 
-    connect(m_session, &SmbSession::operationSucceeded,
-            this, &HardLinkDialog::onOpSucceeded);
-    connect(m_session, &SmbSession::operationFailed,
-            this, &HardLinkDialog::onOpFailed);
+    connect(m_runner, &LinkRunner::jobStatusChanged, this, [this](int job, const QString &text) {
+        m_jobItems.at(job)->setText(kStatusColumn, text);
+    });
+    connect(m_runner, &LinkRunner::jobFinished,
+            this, [this](int job, bool /*success*/, const QString &message) {
+        m_jobItems.at(job)->setText(kStatusColumn, message);
+    });
+    connect(m_runner, &LinkRunner::allFinished, this, &HardLinkDialog::finishRun);
 
     resize(720, 320);
 }
@@ -96,20 +99,20 @@ HardLinkDialog::HardLinkDialog(SmbSession *session, const QList<SelectedFile> &f
 void HardLinkDialog::startLinking()
 {
     const int primary = m_primaryGroup->checkedId();
-    if (primary < 0) {
+    if (primary < 0 || m_runner->isRunning()) {
         return;
     }
-    m_primaryPath = m_files.at(primary).path;
+    const QString primaryPath = m_files.at(primary).path;
 
-    m_victims.clear();
+    QList<LinkRunner::Job> jobs;
+    m_jobItems.clear();
     for (int i = 0; i < m_files.size(); ++i) {
         QTreeWidgetItem *item = m_list->topLevelItem(i);
         if (i == primary) {
             item->setText(kStatusColumn, tr("kept (primary)"));
         } else {
-            m_victims.append({m_files.at(i).path,
-                              m_files.at(i).path + kTmpSuffix,
-                              item});
+            jobs.append({primaryPath, m_files.at(i).path});
+            m_jobItems.append(item);
         }
         // No changing your mind mid-run.
         if (auto *radio = m_list->itemWidget(item, kKeepColumn)) {
@@ -121,103 +124,15 @@ void HardLinkDialog::startLinking()
     // dialog can only be closed between runs.
     m_linkButton->setEnabled(false);
     m_closeButton->setEnabled(false);
-    m_current = -1;
-    m_replaced = 0;
-    m_failed = 0;
-    startNextVictim();
+    m_runner->start(jobs);
 }
 
-void HardLinkDialog::startNextVictim()
+void HardLinkDialog::finishRun(int replaced, int failed)
 {
-    ++m_current;
-    if (m_current >= m_victims.size()) {
-        finishRun();
-        return;
-    }
-    const Victim &victim = m_victims.at(m_current);
-    setStatus(victim, tr("moving original aside…"));
-    m_step = Step::Rename;
-    m_opId = m_session->renameFile(victim.path, victim.tmpPath);
-}
-
-void HardLinkDialog::onOpSucceeded(quint64 id)
-{
-    if (id != m_opId) {
-        return;
-    }
-    const Victim &victim = m_victims.at(m_current);
-
-    switch (m_step) {
-    case Step::Rename:
-        setStatus(victim, tr("creating hard link…"));
-        m_step = Step::Link;
-        m_opId = m_session->createHardLink(m_primaryPath, victim.path);
-        break;
-    case Step::Link:
-        setStatus(victim, tr("removing original…"));
-        m_step = Step::Unlink;
-        m_opId = m_session->removeFile(victim.tmpPath);
-        break;
-    case Step::Unlink:
-        setStatus(victim, tr("replaced with hard link"));
-        ++m_replaced;
-        startNextVictim();
-        break;
-    case Step::UndoRename:
-        // The failed-link status text is already in place; add the good news.
-        setStatus(victim, victim.item->text(kStatusColumn) + tr(" (original restored)"));
-        startNextVictim();
-        break;
-    }
-}
-
-void HardLinkDialog::onOpFailed(quint64 id, const QString &message)
-{
-    if (id != m_opId) {
-        return;
-    }
-    const Victim &victim = m_victims.at(m_current);
-
-    switch (m_step) {
-    case Step::Rename:
-        ++m_failed;
-        setStatus(victim, tr("failed: %1").arg(message));
-        startNextVictim();
-        break;
-    case Step::Link:
-        // The original is intact under the tmp name; put it back.
-        ++m_failed;
-        setStatus(victim, tr("link failed: %1").arg(message));
-        m_step = Step::UndoRename;
-        m_opId = m_session->renameFile(victim.tmpPath, victim.path);
-        break;
-    case Step::Unlink:
-        // The link exists; only the cleanup of the tmp copy failed.
-        ++m_failed;
-        setStatus(victim, tr("linked, but could not remove %1: %2")
-                              .arg(victim.tmpPath, message));
-        startNextVictim();
-        break;
-    case Step::UndoRename:
-        setStatus(victim, victim.item->text(kStatusColumn)
-                              + tr(" — RESTORE FAILED, original left at %1: %2")
-                                    .arg(victim.tmpPath, message));
-        startNextVictim();
-        break;
-    }
-}
-
-void HardLinkDialog::setStatus(const Victim &victim, const QString &text)
-{
-    victim.item->setText(kStatusColumn, text);
-}
-
-void HardLinkDialog::finishRun()
-{
-    m_summaryLabel->setText(m_failed == 0
-                                ? tr("Replaced %1 file(s) with hard links.").arg(m_replaced)
+    m_summaryLabel->setText(failed == 0
+                                ? tr("Replaced %1 file(s) with hard links.").arg(replaced)
                                 : tr("Replaced %1 file(s); %2 failed — see Status.")
-                                      .arg(m_replaced).arg(m_failed));
+                                      .arg(replaced).arg(failed));
     m_closeButton->setText(tr("Close"));
     m_closeButton->setEnabled(true);
     // The run happened; make exec() report it so the views get refreshed.

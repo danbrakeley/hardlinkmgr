@@ -35,6 +35,21 @@ persisted), and the flip to a GUI-subsystem executable (`WIN32_EXECUTABLE ON`
 26.04 the `linux-*` presets build with system Qt 6.10 and no source changes;
 apt packages are documented in README's Linux build section, and the
 against-the-real-share spot checks live in `docs/testing.md` (Milestone 6).
+Post-POC, the Match Finder (roadmap's "Generate a list of potential matches")
+is implemented: `src/core/MatchSearcher` recursively enumerates the primary and
+secondary paths via concurrent `listDirectory` calls (bounded in flight,
+replies correlated by path, cancel = stop scheduling and drop late replies;
+each directory's primary/secondary membership is derived from its path vs the
+two roots so overlapping/nested roots are listed once) and pairs files by size
+window, dropping pairs that already share an inode; `src/core/LinkRunner` is
+the per-victim rename → link → unlink engine extracted from `HardLinkDialog`
+(which now drives it), reused by `src/ui/MatchFinderPanel` — the right side of
+a new horizontal splitter in `MainWindow` — whose checkable results
+(`src/models/MatchResultsModel` + `src/ui/CheckBoxHeader`) feed "Link Selected
+Matches"; selecting a result row reveals both files in the first two views via
+`FileBrowserView::navigateToAndReveal`. Match Finder options persist under
+`matchfinder/` QSettings keys, and saved paths are validated on connect
+(cleared if absent on that server).
 Gotcha discovered in milestone 2: `smb2_destroy_context` flushes pending
 callbacks with `SMB2_STATUS_SHUTDOWN`, so SmbSession callbacks must check
 `m_inTeardown` and only release resources on that path.

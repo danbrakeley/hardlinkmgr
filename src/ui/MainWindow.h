@@ -14,6 +14,7 @@ class QTimer;
 class QToolBar;
 
 class FileBrowserView;
+class MatchFinderPanel;
 
 class MainWindow : public QMainWindow
 {
@@ -27,11 +28,14 @@ protected:
 
 private:
     void restoreWindowGeometry();
+    void saveSplitterState();
     void onConnectActionTriggered();
     void onLinkActionTriggered();
     void updateLinkAction();
     void addView();
     void removeView(FileBrowserView *view);
+    void onRevealRequested(const QString &primaryFolder, const QString &primaryName,
+                           const QString &secondaryFolder, const QString &secondaryName);
     void onSessionStateChanged(SmbSession::State state);
     void onSessionError(const QString &message);
     void advanceSpinner();
@@ -44,7 +48,9 @@ private:
     QAction *m_linkAction = nullptr;
     QAction *m_addViewAction = nullptr;
     QLabel *m_centralLabel = nullptr;         // placeholder while not connected
-    QSplitter *m_splitter = nullptr;          // central widget while connected
+    QSplitter *m_hSplitter = nullptr;         // central widget while connected
+    QSplitter *m_splitter = nullptr;          // left side: the stacked views
+    MatchFinderPanel *m_matchPanel = nullptr; // right side of m_hSplitter
     QList<FileBrowserView *> m_views;         // children of m_splitter
     QTimer *m_spinnerTimer = nullptr;
     int m_spinnerAngle = 0;
