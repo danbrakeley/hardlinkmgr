@@ -178,3 +178,52 @@ Linux build (Ubuntu 26.04, setup per the Linux section of `README.md`).
   (milestone 4 spot check).
 - [x] **Remembered URL:** the last URL persists across relaunch
   (`QSettings` lands in `~/.config` on Linux).
+
+## Milestone 7
+
+Match Finder: the search options + results panel right of the file views
+(design in `roadmap.md`, "Generate a list of potential matches"). **The link
+checks replace file contents by design — point the paths at throwaway
+copies.**
+
+- [ ] **Panel + splitter:** connect. The views sit left, the Match Finder
+  panel right, in a resizable splitter. Drag the divider, disconnect,
+  reconnect, then quit and relaunch — the position is restored each time.
+- [ ] **Options persist:** set both paths, uncheck one "Include Subfolders",
+  change both sizes and units, quit, relaunch, connect. Everything is
+  restored.
+- [ ] **Saved-path validation:** connect to a server (or share) that lacks a
+  saved path. That path field is cleared and the status bar explains why;
+  a valid saved path survives untouched.
+- [ ] **Dialog regression:** the toolbar Link flow (select 2+ files across
+  views) behaves exactly as before — statuses walk the same steps, failures
+  report the same messages (the engine moved into `LinkRunner`).
+- [ ] **Basic search:** point Primary and Secondary at two known folders,
+  defaults (10 MiB / 0 MiB). Progress text updates while listing; on
+  completion the expected same-size pairs appear and pairs that are already
+  hard-linked (same inode) are absent.
+- [ ] **Overlapping paths:** set Primary == Secondary — results contain no
+  self-pairs and no A/B + B/A duplicate rows. Then nest Secondary inside a
+  recursive Primary — the overlap is listed once (watch the folder count in
+  the progress text).
+- [ ] **Include Subfolders off:** uncheck it on one side — only that root's
+  direct files are considered.
+- [ ] **Size options:** Size Min 0 lets small files in; Size Difference 0
+  yields exact-size matches only; a small nonzero difference adds near-size
+  pairs.
+- [ ] **Cancel mid-search:** on a big tree, click Cancel Search. The button
+  reverts to Start Search, no errors or stale results appear, and the table
+  keeps whatever it showed before the search.
+- [ ] **Search errors:** a nonexistent Primary path fails the search with a
+  message in the panel; an unlistable *subfolder* (permissions) lets the
+  search complete with "N folder(s) could not be listed".
+- [ ] **Row reveal:** with only one view open, click a result row — a second
+  view is added, view 1 navigates to and selects the primary file, view 2
+  the secondary. Arrow-keying between rows re-reveals; a view whose filter
+  hides the file has its filter cleared.
+- [ ] **Check-all + link run:** the header checkbox checks/unchecks every
+  row (tri-state with a partial selection). Link Selected Matches enables at
+  ≥1 checked; checking two rows that share a file is blocked with a conflict
+  warning; the confirmation shows the right count; during the run each row's
+  Status walks the steps, failure text stays in the row, and all file views
+  refresh afterward with updated link counts and no leftover `*.hlmgr-tmp`.
