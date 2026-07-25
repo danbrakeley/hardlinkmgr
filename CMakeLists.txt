@@ -31,8 +31,8 @@ set(ENABLE_GSSAPI     OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
   libsmb2
-  GIT_REPOSITORY https://github.com/danbrakeley/libsmb2.git
-  GIT_TAG        858184e837180410906ce34e8a56984178f1e55a
+  GIT_REPOSITORY https://github.com/sahlberg/libsmb2.git
+  GIT_TAG        6723c56fd6f5a597fc04cc091401349f50c00afc
   GIT_SHALLOW    FALSE   # required: a shallow clone can't check out an arbitrary SHA
 )
 FetchContent_MakeAvailable(libsmb2)
