@@ -136,3 +136,26 @@ include(CTest)
 if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
+
+# ---------------------------------------------------------------------------
+# Packaging — Linux .deb via CPack (Windows releases are windeployqt's staged
+# bin/ folder, zipped directly by CI; no install()/CPack involved there).
+# libsmb2 is linked statically (see BUILD_SHARED_LIBS above), so the only
+# runtime dependency to declare is system Qt; CPACK_DEBIAN_PACKAGE_SHLIBDEPS
+# derives that Depends: line from the built binary instead of us hardcoding
+# per-distro package names (which have shifted across Ubuntu releases, e.g.
+# the "t64" suffix from the 24.04 time64 ABI transition).
+# ---------------------------------------------------------------------------
+if(UNIX AND NOT APPLE)
+  if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Install prefix" FORCE)
+  endif()
+
+  install(TARGETS hardlinkmgr RUNTIME DESTINATION bin)
+
+  set(CPACK_GENERATOR "DEB")
+  set(CPACK_PACKAGE_CONTACT "Dan Brakeley <dan@brakeley.net>")
+  set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+  set(CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT") # <name>_<version>_<arch>.deb
+  include(CPack)
+endif()

@@ -14,7 +14,6 @@ Pri: 1 (highest) to 5 (lowest)
 
 | Pri | Name                                   | Notes                                                        |
 | --- | -------------------------------------- | ------------------------------------------------------------ |
-| 1   | Testing                                | automatic testing against a test server                      |
 | 2   | Build/release workflows                | right now I just build an EXE by hand, no releases           |
 | 3   | Keep log/history of actions/errors     | Could be useful for debugging                                |
 | 4   | Link button is confusing               | is it?                                                       |
@@ -25,6 +24,7 @@ Pri: 1 (highest) to 5 (lowest)
 | 5   | Parent folder icon doesn't read well   | Doesn't read as having to do with folder navigation          |
 | 5   | Toolbar toggle buttons don't read well | Toggle-ability and current state not obvious                 |
 | √   | ~~Improve finding matches~~            | **Match Finder shipped as Milestone 7 (2026-07-22)**         |
+| √   | ~~Testing~~                            | **Unit & Integration tests added 2026-07-28**                |
 
 ## Keep log/history of actions/errors
 

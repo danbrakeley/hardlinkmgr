@@ -1,0 +1,94 @@
+name: Release
+
+# Push a "v*" tag to build and attach binaries to a GitHub Release.
+# workflow_dispatch runs the same build+package steps without creating a
+# release, for manual test builds.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # only needed for the release job's upload
+
+jobs:
+  windows:
+    runs-on: windows-latest # currently Visual Studio 2026, matching CMakePresets.json's "windows" preset generator
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          # 6.11.1 (the local dev kit CMakePresets.json's "windows" preset points
+          # at) isn't installable via aqtinstall yet, so CI is pinned one minor
+          # line behind at the newest version aqt actually has for this arch.
+          # Keep this in sync with the path used to override CMAKE_PREFIX_PATH
+          # in the Configure step below.
+          version: '6.8.3'
+          arch: 'win64_msvc2022_64'
+          # Qt SVG ships as an archive inside the base kit for this arch (confirmed
+          # via `aqt list-qt windows desktop --archives 6.8.3 win64_msvc2022_64`),
+          # not as an addon module — requesting it via `modules:` errors because
+          # there's no separate "qtsvg" module to request.
+          dir: '${{ github.workspace }}/qt'
+
+      - name: Configure
+        # Override CMAKE_PREFIX_PATH: the "windows" preset hardcodes a local dev
+        # Qt install path, CI's Qt lives wherever install-qt-action put it.
+        run: cmake --preset windows -DCMAKE_PREFIX_PATH="${{ github.workspace }}/qt/6.8.3/msvc2022_64"
+
+      - name: Build
+        run: cmake --build --preset windows-release
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse "build/windows/bin/Release" "hardlinkmgr-windows-x64"
+          Compress-Archive -Path "hardlinkmgr-windows-x64" -DestinationPath "hardlinkmgr-windows-x64.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-release
+          path: hardlinkmgr-windows-x64.zip
+
+  linux:
+    runs-on: ubuntu-26.04 # matches the version the linux-* presets are documented/tested against
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build qt6-base-dev qt6-svg-dev qt6-wayland libgl1-mesa-dev
+
+      - name: Configure
+        run: cmake --preset linux-release
+
+      - name: Build
+        run: cmake --build --preset linux-release
+
+      - name: Package .deb
+        run: |
+          cd build/linux-release
+          cpack -G DEB
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-release
+          path: build/linux-release/*.deb
+
+  release:
+    needs: [windows, linux]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            artifacts/windows-release/*.zip
+            artifacts/linux-release/*.deb
