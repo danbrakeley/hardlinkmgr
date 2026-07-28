@@ -1,13 +1,14 @@
 #include "FileBrowserView.h"
 
+#include <QAction>
+#include <QActionGroup>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QItemSelectionModel>
 #include <QLabel>
 #include <QLineEdit>
-#include <QPainter>
+#include <QMenu>
 #include <QScrollBar>
-#include <QStyle>
 #include <QToolButton>
 #include <QTreeView>
 #include <QVBoxLayout>
@@ -19,27 +20,13 @@ namespace {
 // unsent backlog is simply dropped).
 constexpr int kMaxStatsInFlight = 32;
 
-// There is no stock "case sensitivity" icon, so paint an "Aa".
-QIcon makeCaseSensitivityIcon(QFont font, const QPalette &palette)
-{
-    QPixmap pixmap(32, 32);
-    pixmap.fill(Qt::transparent);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::TextAntialiasing);
-    font.setBold(true);
-    font.setPixelSize(20);
-    painter.setFont(font);
-    painter.setPen(palette.color(QPalette::ButtonText));
-    painter.drawText(pixmap.rect(), Qt::AlignCenter, QStringLiteral("Aa"));
-    return QIcon(pixmap);
-}
-
 } // namespace
 
 #include "core/PathUtil.h"
 #include "models/FileFilterProxyModel.h"
 #include "models/FileListModel.h"
 #include "smb/SmbSession.h"
+#include "ui/IconUtil.h"
 
 FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     : QWidget(parent)
@@ -50,9 +37,10 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     m_proxy->setSourceModel(m_model);
 
     m_upButton = new QToolButton(this);
-    m_upButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogToParent));
+    m_upButton->setIcon(coloredIcon(QStringLiteral(":/icons/folder_parent.svg"),
+                                    palette().color(QPalette::ButtonText),
+                                    m_upButton->iconSize(), devicePixelRatioF()));
     m_upButton->setToolTip(tr("Go up to the parent folder"));
-    m_upButton->setAutoRaise(true);
     m_upButton->setEnabled(false); // no parent until a listing below "/" succeeds
     connect(m_upButton, &QToolButton::clicked, this, [this] {
         if (m_currentPath.isEmpty() || m_currentPath == QLatin1String("/")) {
@@ -66,26 +54,45 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     connect(m_pathEdit, &QLineEdit::returnPressed,
             this, &FileBrowserView::onPathEdited);
 
-    m_foldersFirstButton = new QToolButton(this);
-    m_foldersFirstButton->setIcon(style()->standardIcon(QStyle::SP_DirIcon));
-    m_foldersFirstButton->setCheckable(true);
-    m_foldersFirstButton->setChecked(true);
-    m_foldersFirstButton->setAutoRaise(true);
-    m_foldersFirstButton->setToolTip(tr("Keep folders sorted to the top.\n"
-                                        "When off, folders sort among the files."));
-    connect(m_foldersFirstButton, &QToolButton::toggled, this, [this](bool on) {
-        m_proxy->setFoldersFirst(on);
-    });
+    m_sortButton = new QToolButton(this);
+    m_sortButton->setIcon(coloredIcon(QStringLiteral(":/icons/list_arrow.svg"),
+                                      palette().color(QPalette::ButtonText),
+                                      m_sortButton->iconSize(), devicePixelRatioF()));
+    m_sortButton->setText(tr("Sort"));
+    m_sortButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_sortButton->setToolTip(tr("Sort options"));
+    m_sortButton->setAutoRaise(true);
+    m_sortButton->setPopupMode(QToolButton::InstantPopup);
 
-    m_caseSensitiveButton = new QToolButton(this);
-    m_caseSensitiveButton->setIcon(makeCaseSensitivityIcon(font(), palette()));
-    m_caseSensitiveButton->setCheckable(true); // off by default: case-insensitive
-    m_caseSensitiveButton->setAutoRaise(true);
-    m_caseSensitiveButton->setToolTip(tr("Sort names case-sensitively (uppercase sorts before lowercase).\n"
-                                         "When off, sorting ignores case."));
-    connect(m_caseSensitiveButton, &QToolButton::toggled, this, [this](bool on) {
-        m_proxy->setSortCaseSensitivity(on ? Qt::CaseSensitive : Qt::CaseInsensitive);
-    });
+    auto *sortMenu = new QMenu(m_sortButton);
+
+    sortMenu->addSection(tr("Folders"));
+    auto *foldersGroup = new QActionGroup(sortMenu);
+    QAction *foldersOnTop = sortMenu->addAction(tr("Folders on Top"));
+    foldersOnTop->setCheckable(true);
+    foldersOnTop->setChecked(true); // matches FileFilterProxyModel's default
+    foldersGroup->addAction(foldersOnTop);
+    QAction *foldersAmongFiles = sortMenu->addAction(tr("Folders Sorted with Files"));
+    foldersAmongFiles->setCheckable(true);
+    foldersGroup->addAction(foldersAmongFiles);
+    connect(foldersOnTop, &QAction::triggered, this, [this] { m_proxy->setFoldersFirst(true); });
+    connect(foldersAmongFiles, &QAction::triggered, this, [this] { m_proxy->setFoldersFirst(false); });
+
+    sortMenu->addSection(tr("Case"));
+    auto *caseGroup = new QActionGroup(sortMenu);
+    QAction *caseInsensitive = sortMenu->addAction(tr("Case-Insensitive"));
+    caseInsensitive->setCheckable(true);
+    caseInsensitive->setChecked(true); // matches FileFilterProxyModel's default
+    caseGroup->addAction(caseInsensitive);
+    QAction *caseSensitive = sortMenu->addAction(tr("Case-Sensitive"));
+    caseSensitive->setCheckable(true);
+    caseGroup->addAction(caseSensitive);
+    connect(caseInsensitive, &QAction::triggered, this,
+            [this] { m_proxy->setSortCaseSensitivity(Qt::CaseInsensitive); });
+    connect(caseSensitive, &QAction::triggered, this,
+            [this] { m_proxy->setSortCaseSensitivity(Qt::CaseSensitive); });
+
+    m_sortButton->setMenu(sortMenu);
 
     m_filterEdit = new QLineEdit(this);
     m_filterEdit->setPlaceholderText(tr("Filter"));
@@ -96,14 +103,6 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     });
 
     m_countLabel = new QLabel(this);
-
-    m_closeButton = new QToolButton(this);
-    m_closeButton->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton));
-    m_closeButton->setToolTip(tr("Close this view"));
-    m_closeButton->setAutoRaise(true);
-    m_closeButton->setVisible(false); // shown once there is more than one view
-    connect(m_closeButton, &QToolButton::clicked,
-            this, [this] { emit closeRequested(); });
 
     m_tree = new QTreeView(this);
     m_tree->setModel(m_proxy);
@@ -130,11 +129,9 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     auto *toolbarLayout = new QHBoxLayout;
     toolbarLayout->addWidget(m_upButton);
     toolbarLayout->addWidget(m_pathEdit, /*stretch*/ 3);
-    toolbarLayout->addWidget(m_foldersFirstButton);
-    toolbarLayout->addWidget(m_caseSensitiveButton);
+    toolbarLayout->addWidget(m_sortButton);
     toolbarLayout->addWidget(m_filterEdit, /*stretch*/ 1);
     toolbarLayout->addWidget(m_countLabel);
-    toolbarLayout->addWidget(m_closeButton);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(4, 4, 4, 4);
@@ -176,11 +173,6 @@ void FileBrowserView::refresh()
     if (!m_currentPath.isEmpty()) {
         navigateTo(m_currentPath);
     }
-}
-
-void FileBrowserView::setClosable(bool closable)
-{
-    m_closeButton->setVisible(closable);
 }
 
 void FileBrowserView::navigateTo(const QString &path)

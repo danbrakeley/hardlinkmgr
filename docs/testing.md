@@ -144,12 +144,8 @@ in a test directory** — the run replaces file contents by design.
 
 Multiple views + polish.
 
-- [x] **Add view:** connect, then click "Add View". A second view appears
-  below the first in a resizable splitter, starting at `/`, with its own
-  path, filter, and sort toggles working independently.
-- [x] **Close view:** with 2+ views, each shows a close button at the right
-  of its toolbar; with only one view the button is hidden. Closing removes
-  just that view.
+- ~~**Add view:** connect, then click "Add View". A second view appears below the first in a resizable splitter, starting at `/`, with its own path, filter, and sort toggles working independently.~~
+- ~~**Close view:** with 2+ views, each shows a close button at the right of its toolbar; with only one view the button is hidden. Closing removes just that view.~~
 - [x] **Cross-view selection:** select one file in one view and one in
   another — Link enables. The same file selected in both views counts once
   (Link stays disabled until a second distinct file is selected).
@@ -217,10 +213,7 @@ copies.**
 - [ ] **Search errors:** a nonexistent Primary path fails the search with a
   message in the panel; an unlistable *subfolder* (permissions) lets the
   search complete with "N folder(s) could not be listed".
-- [ ] **Row reveal:** with only one view open, click a result row — a second
-  view is added, view 1 navigates to and selects the primary file, view 2
-  the secondary. Arrow-keying between rows re-reveals; a view whose filter
-  hides the file has its filter cleared.
+- ~~**Row reveal:** with only one view open, click a result row — a second view is added, view 1 navigates to and selects the primary file, view 2 the secondary. Arrow-keying between rows re-reveals; a view whose filter hides the file has its filter cleared.~~
 - [ ] **Check-all + link run:** the header checkbox checks/unchecks every
   row (tri-state with a partial selection). Link Selected Matches enables at
   ≥1 checked; checking two rows that share a file is blocked with a conflict

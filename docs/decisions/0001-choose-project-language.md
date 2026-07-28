@@ -110,58 +110,6 @@ library — a UI cost to budget for, not a stack differentiator.
 - Neutral, because **Qt licensing** (LGPLv3) is satisfied by dynamic linking,
   which is the intended distribution model.
 
-### Confirmation
-
-SMB feasibility is already confirmed by `spikes/01_libsmb2` passing against the
-real server. The end-to-end fitness function for this decision is: a Qt
-application that links the patched libsmb2, connects to the target share, lists a
-directory with inode/link-count columns, and creates a hard link from the GUI
-that the server reflects as an incremented link count. The libsmb2 fork patch
-(and its build-env fixes) is the artifact that must be carried forward and
-re-verified whenever libsmb2 is updated.
-
-## Pros and Cons of the Options
-
-### C++ / Qt Widgets / libsmb2
-
-Native-styled widgets, mature model/view tables, patched libsmb2 for SMB.
-
-- Good, because native look-and-feel across Windows and Linux (only option that
-  delivers this).
-- Good, because the model/view table framework fits the app almost 1:1.
-- Good, because SMB is proven via the libsmb2 spike, and instant startup + small
-  dynamically-linked binary meet the constraints.
-- Good, because it leverages the author's C++/Qt background.
-- Bad, because C++ ceremony, a maintained libsmb2 fork, larger deployment
-  footprint, and heavier cross-platform CI.
-
-### Go / Fyne / go-smb2
-
-Single static binary, easy cross-compilation, fast to develop in.
-
-- Good, because trivial cross-compilation and a single static binary; no cgo for
-  the SMB layer (go-smb2 is pure Go); high developer velocity.
-- Good, because SMB is feasible (proven in spike 02, via a fork).
-- Neutral, because it still needs a forked go-smb2 (add `Link`, expose
-  inode/link-count).
-- Bad, because Fyne renders a non-native Material-ish theme, missing the
-  native-look goal.
-- Bad, because Fyne's table/selection model is more basic; the sortable,
-  filterable, multi-pane file view is more hand-built than in Qt.
-
-### Rust / egui (or Slint) / OS-mount or patched SMB
-
-Immediate-mode UI is a strong fit for data tables; excellent performance.
-
-- Good, because egui's immediate mode fits "hold full list, render filtered
-  subset" naturally; tiny memory, instant startup, single binary.
-- Neutral, because Slint offers a more declarative, themeable alternative.
-- Bad, because non-native look, like Fyne.
-- Bad, because Rust's userspace SMB story is the weakest (`pavao`/libsmbclient is
-  a C dependency, poor on Windows), likely forcing an OS-mount approach and
-  giving up the in-app connect flow.
-- Bad, because it's the author's least-fluent option for a solo project.
-
 ## More Information
 
 - Spikes: `spikes/01_libsmb2/` (chosen SMB library, with the `smb2_link` patch and
@@ -170,7 +118,3 @@ Immediate-mode UI is a strong fit for data tables; excellent performance.
 - The libsmb2 `smb2_link` patch is small and self-contained; see
   `spikes/01_libsmb2/README.md` for the exact edits (encoder fallthrough,
   `smb2_link`/`smb2_link_async`, `libsmb2.syms` export, and MSVC build fixes).
-- Revisit this decision if: the target server is replaced with one whose SMB
-  stack does not report stable inode / accurate link count (which would push
-  toward an OS-mount design and reopen the toolkit choice), or if maintaining the
-  libsmb2 fork becomes a burden.

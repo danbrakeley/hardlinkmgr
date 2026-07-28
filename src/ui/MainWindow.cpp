@@ -2,6 +2,7 @@
 
 #include "ui/FileBrowserView.h"
 #include "ui/HardLinkDialog.h"
+#include "ui/IconUtil.h"
 #include "ui/MatchFinderPanel.h"
 
 #include <QAction>
@@ -16,7 +17,6 @@
 #include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
-#include <QStyle>
 #include <QTimer>
 #include <QToolBar>
 #include <QUrl>
@@ -38,6 +38,10 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolBar->setMovable(false);
     m_toolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
+    m_connectAction = m_toolBar->addAction(QString());
+    connect(m_connectAction, &QAction::triggered,
+        this, &MainWindow::onConnectActionTriggered);
+
     m_urlEdit = new QLineEdit(this);
     m_urlEdit->setPlaceholderText(QStringLiteral("smb://user@host:port/share"));
     m_urlEdit->setClearButtonEnabled(true);
@@ -45,9 +49,6 @@ MainWindow::MainWindow(QWidget *parent)
     m_urlEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_toolBar->addWidget(m_urlEdit);
 
-    m_connectAction = m_toolBar->addAction(QString());
-    connect(m_connectAction, &QAction::triggered,
-            this, &MainWindow::onConnectActionTriggered);
     connect(m_urlEdit, &QLineEdit::returnPressed, this, [this] {
         if (m_session->state() == SmbSession::State::Disconnected) {
             m_connectAction->trigger();
@@ -61,12 +62,6 @@ MainWindow::MainWindow(QWidget *parent)
     m_linkAction->setToolTip(tr("Replace selected files with hard links (select at least two files)"));
     connect(m_linkAction, &QAction::triggered,
             this, &MainWindow::onLinkActionTriggered);
-
-    m_addViewAction = m_toolBar->addAction(tr("Add View"));
-    m_addViewAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
-    m_addViewAction->setToolTip(tr("Add another filesystem view below the current ones"));
-    m_addViewAction->setEnabled(false);
-    connect(m_addViewAction, &QAction::triggered, this, &MainWindow::addView);
 
     m_spinnerTimer = new QTimer(this);
     m_spinnerTimer->setInterval(80);
@@ -172,7 +167,9 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         m_spinnerTimer->stop();
         m_connectAction->setText(tr("Connect"));
         m_connectAction->setToolTip(tr("Connect to the SMB share"));
-        m_connectAction->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
+        m_connectAction->setIcon(coloredIcon(QStringLiteral(":/icons/desktop_windows.svg"),
+                                              palette().color(QPalette::ButtonText),
+                                              m_toolBar->iconSize(), devicePixelRatioF()));
         m_urlEdit->setEnabled(true);
         if (!m_centralLabel) {
             saveSplitterState();
@@ -202,7 +199,9 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         m_spinnerTimer->stop();
         m_connectAction->setText(tr("Disconnect"));
         m_connectAction->setToolTip(tr("Disconnect from the share"));
-        m_connectAction->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
+        m_connectAction->setIcon(coloredIcon(QStringLiteral(":/icons/desktop_access_disabled.svg"),
+                                              palette().color(QPalette::ButtonText),
+                                              m_toolBar->iconSize(), devicePixelRatioF()));
         m_urlEdit->setEnabled(false);
         QSettings().setValue(QStringLiteral("connect/lastUrl"), m_urlEdit->text().trimmed());
         m_hSplitter = new QSplitter(Qt::Horizontal, this);
@@ -234,12 +233,15 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
                 m_hSplitter->restoreState(state);
             }
         }
+
+        // start with 2 views
         addView();
+        addView();
+
         m_matchPanel->beginPathValidation();
         statusBar()->showMessage(tr("Connected to %1.").arg(m_shareDisplayName));
         break;
     }
-    m_addViewAction->setEnabled(state == SmbSession::State::Connected);
     updateLinkAction();
 }
 
@@ -253,27 +255,9 @@ void MainWindow::addView()
             this, &MainWindow::onSessionError);
     connect(view, &FileBrowserView::selectionChanged,
             this, &MainWindow::updateLinkAction);
-    connect(view, &FileBrowserView::closeRequested,
-            this, [this, view] { removeView(view); });
     m_views.append(view);
     m_splitter->addWidget(view);
     view->navigateTo(QStringLiteral("/"));
-    for (FileBrowserView *v : std::as_const(m_views)) {
-        v->setClosable(m_views.size() > 1);
-    }
-}
-
-void MainWindow::removeView(FileBrowserView *view)
-{
-    if (m_views.size() <= 1 || !m_views.contains(view)) {
-        return;
-    }
-    m_views.removeOne(view);
-    view->deleteLater(); // the splitter drops it once deleted
-    for (FileBrowserView *v : std::as_const(m_views)) {
-        v->setClosable(m_views.size() > 1);
-    }
-    updateLinkAction();
 }
 
 // "Link" needs at least two distinct files selected across all views.

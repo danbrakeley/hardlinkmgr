@@ -33,7 +33,6 @@ private:
     void onLinkActionTriggered();
     void updateLinkAction();
     void addView();
-    void removeView(FileBrowserView *view);
     void onRevealRequested(const QString &primaryFolder, const QString &primaryName,
                            const QString &secondaryFolder, const QString &secondaryName);
     void onSessionStateChanged(SmbSession::State state);
@@ -46,7 +45,6 @@ private:
     QLineEdit *m_urlEdit = nullptr;
     QAction *m_connectAction = nullptr;
     QAction *m_linkAction = nullptr;
-    QAction *m_addViewAction = nullptr;
     QLabel *m_centralLabel = nullptr;         // placeholder while not connected
     QSplitter *m_hSplitter = nullptr;         // central widget while connected
     QSplitter *m_splitter = nullptr;          // left side: the stacked views

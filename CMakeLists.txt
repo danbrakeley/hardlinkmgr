@@ -41,7 +41,7 @@ FetchContent_MakeAvailable(libsmb2)
 # Qt — found from the installed kit. CMAKE_PREFIX_PATH is supplied by the
 # active CMake preset (see CMakePresets.json).
 # ---------------------------------------------------------------------------
-find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network Svg)
 qt_standard_project_setup()
 
 qt_add_executable(hardlinkmgr
@@ -66,20 +66,30 @@ qt_add_executable(hardlinkmgr
   src/ui/FileBrowserView.h
   src/ui/HardLinkDialog.cpp
   src/ui/HardLinkDialog.h
+  src/ui/IconUtil.cpp
+  src/ui/IconUtil.h
   src/ui/MainWindow.cpp
   src/ui/MainWindow.h
   src/ui/MatchFinderPanel.cpp
   src/ui/MatchFinderPanel.h
+  resources/icons/icons.qrc
 )
 
 target_include_directories(hardlinkmgr PRIVATE src)
 
 # GUI app (no console window); was a console app during early development.
-set_target_properties(hardlinkmgr PROPERTIES WIN32_EXECUTABLE ON)
+# AUTORCC: qt_standard_project_setup()/qt_add_executable() only turn on
+# AUTOMOC by default, so resources/icons/icons.qrc needs this to actually be
+# run through rcc instead of being copied in as an inert source file.
+set_target_properties(hardlinkmgr PROPERTIES
+  WIN32_EXECUTABLE ON
+  AUTORCC ON
+)
 
 target_link_libraries(hardlinkmgr PRIVATE
   Qt6::Widgets
   Qt6::Network   # QHostInfo: async DNS ahead of libsmb2's blocking resolver
+  Qt6::Svg       # renders the toolbar/action icons in resources/icons
   smb2
 )
 
