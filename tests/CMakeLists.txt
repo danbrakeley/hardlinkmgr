@@ -8,11 +8,14 @@
 
 find_package(Qt6 REQUIRED COMPONENTS Test)
 
-# Umbrella target so `cmake --build --preset <preset> --target hlm_tests`
+# Umbrella targets so `cmake --build --preset <preset> --target hlm_tests`
 # builds every suite in one shot without pulling them into the default ALL
 # target (see EXCLUDE_FROM_ALL on add_subdirectory(tests) in the top-level
-# CMakeLists.txt).
+# CMakeLists.txt). hlm_tests_unit is the "unit"-labeled subset, for CI legs
+# (like Windows) that only ever run `ctest -L unit` and would otherwise waste
+# time building the docker-fixture suites they can never execute.
 add_custom_target(hlm_tests)
+add_custom_target(hlm_tests_unit)
 
 function(hlm_add_test name)
   cmake_parse_arguments(ARG "" "" "SOURCES;LABELS;FIXTURES" ${ARGN})
@@ -20,34 +23,49 @@ function(hlm_add_test name)
   target_link_libraries(${name} PRIVATE hardlinkmgr_core Qt6::Test)
   target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
   add_dependencies(hlm_tests ${name})
+  if("unit" IN_LIST ARG_LABELS)
+    add_dependencies(hlm_tests_unit ${name})
+  endif()
   add_test(NAME ${name} COMMAND ${name})
   set_tests_properties(${name} PROPERTIES LABELS "${ARG_LABELS}")
   if(ARG_FIXTURES)
     set_tests_properties(${name} PROPERTIES FIXTURES_REQUIRED "${ARG_FIXTURES}")
   endif()
-  if(WIN32)
-    # The app's windeployqt run stages everything except Qt6Test.dll (the app
-    # doesn't link Test); deploy per test exe so each runs straight from
-    # bin/<Config> like the app does. windeployqt only stages the qwindows
-    # platform plugin, but the suites run under QT_QPA_PLATFORM=offscreen
-    # (see common/TestMain.h) — copy that plugin in ourselves.
-    add_custom_command(TARGET ${name} POST_BUILD
-      COMMAND Qt6::windeployqt
-              --no-translations
-              --no-compiler-runtime
-              "$<TARGET_FILE:${name}>"
-      COMMAND ${CMAKE_COMMAND} -E make_directory
-              "$<TARGET_FILE_DIR:${name}>/platforms"
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-              "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
-              "$<TARGET_FILE_DIR:${name}>/platforms/"
-      VERBATIM)
+  if(WIN32 AND NOT "${name}" STREQUAL "tst_pathutil")
+    # hlm_tests_deploy_qt (defined right after tst_pathutil below) does the
+    # one shared windeployqt run every other suite needs; see its comment.
+    add_dependencies(${name} hlm_tests_deploy_qt)
   endif()
 endfunction()
 
 # --- Tier 1: pure unit tests, no server --------------------------------------
 
 hlm_add_test(tst_pathutil             SOURCES unit/tst_pathutil.cpp             LABELS "unit")
+
+if(WIN32)
+  # Every suite links identical Qt modules (Core/Gui/Network/Svg/Test/Widgets,
+  # all via hardlinkmgr_core + Qt6::Test), and they all land in the same
+  # bin/<Config> directory — so one windeployqt run (scanning tst_pathutil,
+  # built just above) stages the runtime for all of them. Doing this per test
+  # exe was both slow (15 windeployqt invocations) and, under a parallel
+  # build, a race: concurrent copies into the same directory could collide.
+  # windeployqt only stages the qwindows platform plugin, but the suites run
+  # under QT_QPA_PLATFORM=offscreen (see common/TestMain.h) — copy that
+  # plugin in ourselves.
+  add_custom_target(hlm_tests_deploy_qt
+    COMMAND Qt6::windeployqt
+            --no-translations
+            --no-compiler-runtime
+            "$<TARGET_FILE:tst_pathutil>"
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:tst_pathutil>/platforms"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
+            "$<TARGET_FILE_DIR:tst_pathutil>/platforms/"
+    DEPENDS tst_pathutil
+    VERBATIM)
+endif()
+
 hlm_add_test(tst_smbsharespec         SOURCES unit/tst_smbsharespec.cpp         LABELS "unit")
 hlm_add_test(tst_matchpairing         SOURCES unit/tst_matchpairing.cpp         LABELS "unit")
 hlm_add_test(tst_matchconflicts       SOURCES unit/tst_matchconflicts.cpp       LABELS "unit")

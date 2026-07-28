@@ -13,6 +13,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # alongside them later (windeployqt / macdeployqt).
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+# Compile a single target's source files concurrently (MSVC defaults to one
+# cl.exe per project). Matters most for libsmb2's ~30 .c files and
+# hardlinkmgr_core's own sources, both rebuilt from scratch on every CI run.
+# Set before FetchContent_MakeAvailable(libsmb2) below so it's inherited.
+if(MSVC)
+  add_compile_options(/MP)
+endif()
+
 # ---------------------------------------------------------------------------
 # libsmb2 — patched fork carrying the smb2_link hard-link patch (see ADR 0001
 # and spikes/01_libsmb2). Pinned to an exact commit: bump this deliberately and

@@ -96,18 +96,24 @@ packages and the binary runs in place — no deploy step.
 
 The `tst_*` suites are excluded from the default `ALL` target (so an everyday
 `cmake --build` only builds the app), so build them explicitly before running
-`ctest`:
+`ctest`. Two build targets: `hlm_tests_unit` (just the serverless "unit"-labeled
+suites, matching `ctest ... -unit`) and `hlm_tests` (everything, matching
+`ctest ... -all`) — build the smaller one if that's all you're about to run,
+it skips compiling the docker-fixture suites:
 
 ```powershell
-cmake --build --preset windows-debug --target tests/hlm_tests
+cmake --build --preset windows-debug --target tests/hlm_tests_unit --parallel
 ctest --preset windows-unit    # serverless unit tests (< 1 s)
+
+cmake --build --preset windows-debug --target tests/hlm_tests --parallel
 ctest --preset windows-all     # everything, incl. integration/widget suites
 ```
 
-(On Linux, `cmake --build --preset linux-debug --target hlm_tests`, then
-`linux-unit` / `linux-all`. Windows needs the `tests/` prefix on the target
-name — CMake's Visual Studio generator can't resolve a bare target name for a
-target defined in a subdirectory; Linux's Ninja generator doesn't need it.)
+(On Linux, drop the `tests/` prefix — e.g. `cmake --build --preset
+linux-debug --target hlm_tests --parallel`, then `linux-unit` / `linux-all`.
+Windows needs that prefix because CMake's Visual Studio generator can't
+resolve a bare target name for a target defined in a subdirectory; Linux's
+Ninja generator doesn't need it.)
 
 The full run needs **Docker** with Compose v2: ctest builds and starts a Samba
 container (port 10445, share on a named volume), runs the SMB-backed suites
