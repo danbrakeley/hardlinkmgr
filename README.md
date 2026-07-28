@@ -61,14 +61,23 @@ Tested on Ubuntu 26.04. One-time setup on a fresh system (on top of `git`,
 `curl`, and `build-essential`):
 
 ```bash
-sudo apt install cmake ninja-build qt6-base-dev qt6-wayland libgl1-mesa-dev
+sudo apt install cmake ninja-build qt6-base-dev qt6-svg-dev qt6-wayland libgl1-mesa-dev
 ```
 
 - `cmake` + `ninja-build` — the `linux-*` presets use the Ninja generator.
-- `qt6-base-dev` — Qt Widgets/Network development files (Qt 6.10 on 26.04).
+- `qt6-base-dev` — Qt Widgets/Network/Test development files (Qt 6.10 on
+  26.04); the Test module's CMake config ships in this package too, so no
+  separate package is needed to build the `tests/` suites.
+- `qt6-svg-dev` — Qt6::Svg development files (headers + CMake config), needed
+  for the toolbar/action icons. `qt6-base-dev` only pulls in the runtime
+  library (`libqt6svg6`), not this, so it must be listed explicitly.
 - `qt6-wayland` — Qt's Wayland platform plugin, so the app runs natively on
   Ubuntu's default Wayland session.
 - `libgl1-mesa-dev` — OpenGL headers, required when linking against Qt6::Gui.
+
+The full test run (`linux-all`) additionally needs **Docker** with Compose v2
+on `PATH` (`sudo apt install docker.io docker-compose-v2`, or Docker Desktop);
+see the Tests section below.
 
 Configure then build (reconfigure only after `CMakeLists.txt` edits):
 
