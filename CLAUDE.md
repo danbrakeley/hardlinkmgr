@@ -32,6 +32,10 @@ cmake --build --preset linux-release
 
 Use `linux-debug` in place of `linux-release` for a debug build.
 
+### Tests
+
+Automated suite (architecture in ADR 0004; per-item coverage map in `docs/testing.md`). App code lives in the `hardlinkmgr_core` static library so the `tests/` executables link the same objects; suites are labeled `unit` (serverless) vs `docker` (ctest starts/stops a Samba container from `tests/docker/` on port 10445, share on a named volume, ground truth verified via `docker exec stat`). Run with `ctest --preset windows-unit` (fast, serverless) or `ctest --preset windows-all` (needs Docker); `linux-*` equivalents exist. Test seams: `MainWindow::setPasswordPrompt` (replaces the modal password dialog), `objectName`s on test-relevant widgets (`mw.*`/`fbv.*`/`mfp.*`/`hld.*`), pure logic extracted into `core/MatchPairing.h` + `core/MatchConflicts.h`. Every executable must call `Q_INIT_RESOURCE(icons)` (qrc lives in the static lib). Gotcha found by the suite: completion signals are emitted from inside `smb2_service()`, so `disconnectFromShare()`/`abortConnect()` defer teardown via `m_inService` when called from a handler — don't remove that guard.
+
 ## Technology stack (decided — see ADR 0001)
 
 - **Language:** C++.

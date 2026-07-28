@@ -5,6 +5,7 @@
 #include <QSet>
 #include <QString>
 
+#include "core/MatchPairing.h"
 #include "smb/SmbTypes.h"
 
 class SmbSession;
@@ -36,13 +37,9 @@ public:
         quint64 sizeDiffBytes = 0; // always applied; 0 = exact size only
     };
 
-    struct Match
-    {
-        QString primaryPath;   // full share-absolute file path
-        QString secondaryPath; // full share-absolute file path
-        quint64 primarySize = 0;
-        quint64 secondarySize = 0;
-    };
+    // The pairing math (and this struct) live in core/MatchPairing.h; the
+    // alias keeps MatchSearcher::Match the name the rest of the app uses.
+    using Match = matchpairing::Match;
 
     explicit MatchSearcher(SmbSession *session, QObject *parent = nullptr);
 
@@ -58,18 +55,6 @@ signals:
     void failed(const QString &message); // a root path could not be listed
 
 private:
-    // Which of the two searched trees a directory (and the files directly in
-    // it) belongs to.
-    enum Side : quint8 { kPrimary = 1, kSecondary = 2 };
-
-    struct FileRecord
-    {
-        QString path;
-        quint64 size = 0;
-        quint64 inode = 0;
-        quint8 sides = 0;
-    };
-
     quint8 sideMaskOf(const QString &dirPath) const;
     void enqueueDir(const QString &path);
     void pumpListings();
@@ -87,7 +72,7 @@ private:
     QSet<QString> m_visited;    // dirs scheduled (queued, in flight, or done)
     QList<QString> m_queue;     // dirs waiting for a free listing slot
     QSet<QString> m_inFlight;   // dirs with a listing outstanding
-    QList<FileRecord> m_files;
+    QList<matchpairing::FileRecord> m_files;
     int m_foldersListed = 0;
     int m_folderErrors = 0;
 };

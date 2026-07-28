@@ -44,10 +44,13 @@ FetchContent_MakeAvailable(libsmb2)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Network Svg)
 qt_standard_project_setup()
 
-qt_add_executable(hardlinkmgr
-  src/main.cpp
+# All app code lives in a static library so the test executables under tests/
+# link the exact same objects; the app target is just main.cpp.
+qt_add_library(hardlinkmgr_core STATIC
   src/core/LinkRunner.cpp
   src/core/LinkRunner.h
+  src/core/MatchConflicts.h
+  src/core/MatchPairing.h
   src/core/MatchSearcher.cpp
   src/core/MatchSearcher.h
   src/core/PathUtil.h
@@ -75,18 +78,17 @@ qt_add_executable(hardlinkmgr
   resources/icons/icons.qrc
 )
 
-target_include_directories(hardlinkmgr PRIVATE src)
+target_include_directories(hardlinkmgr_core PUBLIC src)
 
-# GUI app (no console window); was a console app during early development.
-# AUTORCC: qt_standard_project_setup()/qt_add_executable() only turn on
-# AUTOMOC by default, so resources/icons/icons.qrc needs this to actually be
-# run through rcc instead of being copied in as an inert source file.
-set_target_properties(hardlinkmgr PROPERTIES
-  WIN32_EXECUTABLE ON
-  AUTORCC ON
-)
+# AUTORCC: qt_standard_project_setup()/qt_add_library() only turn on AUTOMOC
+# by default, so resources/icons/icons.qrc needs this to actually be run
+# through rcc instead of being copied in as an inert source file. Because the
+# qrc now sits in a static library, the linker may drop its self-registration
+# object — every executable calls Q_INIT_RESOURCE(icons) to force it in
+# (src/main.cpp and tests/common/TestMain.h).
+set_target_properties(hardlinkmgr_core PROPERTIES AUTORCC ON)
 
-target_link_libraries(hardlinkmgr PRIVATE
+target_link_libraries(hardlinkmgr_core PUBLIC
   Qt6::Widgets
   Qt6::Network   # QHostInfo: async DNS ahead of libsmb2's blocking resolver
   Qt6::Svg       # renders the toolbar/action icons in resources/icons
@@ -96,13 +98,24 @@ target_link_libraries(hardlinkmgr PRIVATE
 # libsmb2's public headers include <winsock2.h>/<windows.h>; without
 # WIN32_LEAN_AND_MEAN that drags in the COM headers, which #define `interface`
 # and collide with a struct member of that name in libsmb2's dcerpc header.
-# This is required for any TU that includes libsmb2 on Windows.
+# PUBLIC: required for any TU that includes libsmb2 on Windows, and consumers
+# of this library reach libsmb2 headers through smb/SmbSession.cpp's includes.
 if(WIN32)
-  target_compile_definitions(hardlinkmgr PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+  target_compile_definitions(hardlinkmgr_core PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
 
-  # main.cpp calls WSAStartup itself (libsmb2 leaves Winsock init to the app).
-  target_link_libraries(hardlinkmgr PRIVATE ws2_32)
+  # Executables call WSAStartup themselves (libsmb2 leaves Winsock init to the
+  # app); the import library is carried here so they all link it.
+  target_link_libraries(hardlinkmgr_core PUBLIC ws2_32)
+endif()
 
+qt_add_executable(hardlinkmgr src/main.cpp)
+
+# GUI app (no console window); was a console app during early development.
+set_target_properties(hardlinkmgr PROPERTIES WIN32_EXECUTABLE ON)
+
+target_link_libraries(hardlinkmgr PRIVATE hardlinkmgr_core)
+
+if(WIN32)
   # Stage Qt's runtime DLLs (and plugins) next to the exe after each build so it
   # runs / double-clicks without Qt on PATH. windeployqt auto-detects the build
   # config from the binary.
@@ -113,4 +126,13 @@ if(WIN32)
             "$<TARGET_FILE:hardlinkmgr>"
     COMMENT "Deploying Qt runtime dependencies next to hardlinkmgr.exe"
     VERBATIM)
+endif()
+
+# ---------------------------------------------------------------------------
+# Tests (ctest). BUILD_TESTING is ON by default via include(CTest); the suites
+# labeled "docker" additionally need the Samba fixture (see tests/docker/).
+# ---------------------------------------------------------------------------
+include(CTest)
+if(BUILD_TESTING)
+  add_subdirectory(tests)
 endif()

@@ -230,6 +230,12 @@ void SmbSession::abortConnect()
     if (m_state != State::Connecting) {
         return;
     }
+    if (m_inService) {
+        // See disconnectFromShare().
+        m_teardownPending = true;
+        setState(State::Disconnected);
+        return;
+    }
     teardown();
     setState(State::Disconnected);
 }
@@ -240,6 +246,17 @@ void SmbSession::abortConnect()
 void SmbSession::disconnectFromShare()
 {
     if (m_state != State::Connected) {
+        return;
+    }
+    if (m_inService) {
+        // Completion signals (directoryListed, operationSucceeded, ...) are
+        // emitted from inside smb2_service(), so a handler reacting to one
+        // can land here with the context still on the stack — destroying it
+        // now would crash in the callback flush. Flip the state immediately
+        // (follow-up requests are rejected by the state guards) and let
+        // service() run the actual teardown once smb2_service() has unwound.
+        m_teardownPending = true;
+        setState(State::Disconnected);
         return;
     }
     teardown();
@@ -511,7 +528,10 @@ void SmbSession::service(int revents)
         return;
     }
 
-    if (smb2_service(m_ctx, revents) < 0) {
+    m_inService = true;
+    const int serviced = smb2_service(m_ctx, revents);
+    m_inService = false;
+    if (serviced < 0) {
         if (m_pendingError.isEmpty()) {
             m_pendingError = tr("SMB connection error: %1")
                                  .arg(QString::fromUtf8(smb2_get_error(m_ctx)));

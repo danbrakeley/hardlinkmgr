@@ -8,6 +8,10 @@
 
 int main(int argc, char *argv[])
 {
+    // The app's icons live in hardlinkmgr_core (a static library); force the
+    // linker to keep the resource's self-registration object.
+    Q_INIT_RESOURCE(icons);
+
 #ifdef Q_OS_WIN
     // libsmb2 leaves Winsock startup to the application (its own samples call
     // WSAStartup), so initialize it before any SMB connection is attempted.

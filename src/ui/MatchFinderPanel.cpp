@@ -18,6 +18,7 @@
 #include <limits>
 
 #include "core/LinkRunner.h"
+#include "core/MatchConflicts.h"
 #include "core/PathUtil.h"
 #include "models/MatchResultsModel.h"
 #include "smb/SmbSession.h"
@@ -68,15 +69,23 @@ MatchFinderPanel::MatchFinderPanel(SmbSession *session, QWidget *parent)
 
     m_optionsForm = new QWidget(optionsGroup);
     m_primaryPathEdit = new QLineEdit(m_optionsForm);
+    m_primaryPathEdit->setObjectName(QStringLiteral("mfp.primaryPath"));
     m_primaryPathEdit->setPlaceholderText(QStringLiteral("/path/to/folder"));
     m_primaryRecurse = new QCheckBox(tr("Include Subfolders"), m_optionsForm);
+    m_primaryRecurse->setObjectName(QStringLiteral("mfp.primaryRecurse"));
     m_secondaryPathEdit = new QLineEdit(m_optionsForm);
+    m_secondaryPathEdit->setObjectName(QStringLiteral("mfp.secondaryPath"));
     m_secondaryPathEdit->setPlaceholderText(QStringLiteral("/path/to/folder"));
     m_secondaryRecurse = new QCheckBox(tr("Include Subfolders"), m_optionsForm);
+    m_secondaryRecurse->setObjectName(QStringLiteral("mfp.secondaryRecurse"));
     m_sizeMinValue = makeSizeSpin(m_optionsForm);
+    m_sizeMinValue->setObjectName(QStringLiteral("mfp.sizeMinValue"));
     m_sizeMinUnit = makeUnitCombo(m_optionsForm);
+    m_sizeMinUnit->setObjectName(QStringLiteral("mfp.sizeMinUnit"));
     m_sizeDiffValue = makeSizeSpin(m_optionsForm);
+    m_sizeDiffValue->setObjectName(QStringLiteral("mfp.sizeDiffValue"));
     m_sizeDiffUnit = makeUnitCombo(m_optionsForm);
+    m_sizeDiffUnit->setObjectName(QStringLiteral("mfp.sizeDiffUnit"));
 
     auto *grid = new QGridLayout(m_optionsForm);
     grid->setContentsMargins(0, 0, 0, 0);
@@ -101,9 +110,11 @@ MatchFinderPanel::MatchFinderPanel(SmbSession *session, QWidget *parent)
     grid->setColumnStretch(1, 1);
 
     m_statusLabel = new QLabel(optionsGroup);
+    m_statusLabel->setObjectName(QStringLiteral("mfp.statusLabel"));
     m_statusLabel->setWordWrap(true);
 
     m_startButton = new QPushButton(tr("Start Search"), optionsGroup);
+    m_startButton->setObjectName(QStringLiteral("mfp.startButton"));
     connect(m_startButton, &QPushButton::clicked,
             this, &MatchFinderPanel::onStartClicked);
 
@@ -119,6 +130,7 @@ MatchFinderPanel::MatchFinderPanel(SmbSession *session, QWidget *parent)
     auto *resultsGroup = new QGroupBox(tr("Match Finder Results"), this);
 
     m_tree = new QTreeView(resultsGroup);
+    m_tree->setObjectName(QStringLiteral("mfp.tree"));
     m_header = new CheckBoxHeader(Qt::Horizontal, m_tree);
     m_tree->setHeader(m_header);
     m_tree->setModel(m_model);
@@ -136,6 +148,7 @@ MatchFinderPanel::MatchFinderPanel(SmbSession *session, QWidget *parent)
     m_header->setSectionResizeMode(MatchResultsModel::StatusColumn, QHeaderView::Stretch);
 
     m_linkButton = new QPushButton(tr("Link Selected Matches"), resultsGroup);
+    m_linkButton->setObjectName(QStringLiteral("mfp.linkButton"));
     connect(m_linkButton, &QPushButton::clicked,
             this, &MatchFinderPanel::onLinkSelectedClicked);
 
@@ -388,27 +401,22 @@ void MatchFinderPanel::onLinkSelectedClicked()
         return;
     }
 
-    // The same file appearing twice among the checked rows would make later
-    // jobs act on a path that an earlier job already replaced or renamed.
-    QSet<QString> primaries;
-    QSet<QString> secondaries;
-    QStringList conflicts;
+    QList<MatchSearcher::Match> checkedMatches;
+    checkedMatches.reserve(rows.size());
     for (int row : rows) {
-        const MatchSearcher::Match &match = m_model->matchAt(row);
-        if (secondaries.contains(match.secondaryPath)) {
-            conflicts.append(tr("%1 is the secondary of more than one checked row.")
-                                 .arg(match.secondaryPath));
-        }
-        primaries.insert(match.primaryPath);
-        secondaries.insert(match.secondaryPath);
+        checkedMatches.append(m_model->matchAt(row));
     }
-    for (const QString &path : secondaries) {
-        if (primaries.contains(path)) {
+    const matchconflicts::Conflicts found = matchconflicts::find(checkedMatches);
+    if (!found.isEmpty()) {
+        QStringList conflicts;
+        for (const QString &path : found.duplicateSecondaries) {
+            conflicts.append(tr("%1 is the secondary of more than one checked row.")
+                                 .arg(path));
+        }
+        for (const QString &path : found.primaryAndSecondary) {
             conflicts.append(tr("%1 is both a primary and a secondary among the "
                                 "checked rows.").arg(path));
         }
-    }
-    if (!conflicts.isEmpty()) {
         QMessageBox::warning(this, tr("Conflicting Selections"),
                              tr("Resolve these conflicts (uncheck rows) first:\n\n%1")
                                  .arg(conflicts.join(QLatin1Char('\n'))));

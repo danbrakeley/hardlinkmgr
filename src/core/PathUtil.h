@@ -15,6 +15,15 @@ inline QString normalize(const QString &path)
         p.prepend(QLatin1Char('/'));
     }
     p = QDir::cleanPath(p);
+    // QDir::cleanPath preserves a UNC-style leading "//" (on Windows) and any
+    // ".." segments that would climb above the root; share-absolute paths
+    // have neither.
+    while (p.startsWith(QLatin1String("//"))) {
+        p.remove(0, 1);
+    }
+    while (p == QLatin1String("/..") || p.startsWith(QLatin1String("/../"))) {
+        p.remove(1, 3); // drop the ".." (and its slash) after the root
+    }
     return p.isEmpty() ? QStringLiteral("/") : p;
 }
 

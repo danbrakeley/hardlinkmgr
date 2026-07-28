@@ -82,3 +82,17 @@ Use `linux-debug` in place of `linux-release` for a debug build; unlike the
 multi-config Windows preset, each Linux preset is single-config with its own
 build directory, so both coexist. Qt links dynamically against the system
 packages and the binary runs in place — no deploy step.
+
+## Tests
+
+```powershell
+ctest --preset windows-unit    # serverless unit tests (< 1 s)
+ctest --preset windows-all     # everything, incl. integration/widget suites
+```
+
+(`linux-unit` / `linux-all` on Linux.) The full run needs **Docker** with
+Compose v2: ctest builds and starts a Samba container (port 10445, share on a
+named volume), runs the SMB-backed suites against it, and tears it down.
+Without Docker on PATH those suites aren't registered and the unit tier still
+runs. Details — fixture layout, env overrides, what stays manual — in
+`docs/testing.md` and ADR 0004.

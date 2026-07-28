@@ -3,6 +3,9 @@
 #include <QMainWindow>
 #include <QPixmap>
 
+#include <functional>
+#include <optional>
+
 #include "smb/SmbSession.h"
 
 class QAction;
@@ -22,6 +25,13 @@ class MainWindow : public QMainWindow
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+
+    // How the connect flow asks for the password; std::nullopt = cancelled.
+    // The default shows the modal QInputDialog; tests inject a stub so no
+    // dialog ever blocks a headless run.
+    using PasswordPrompt =
+        std::function<std::optional<QString>(const QString &shareDisplayName)>;
+    void setPasswordPrompt(PasswordPrompt prompt);
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -53,4 +63,5 @@ private:
     QTimer *m_spinnerTimer = nullptr;
     int m_spinnerAngle = 0;
     QString m_shareDisplayName; // user@host/share of the current/last attempt
+    PasswordPrompt m_passwordPrompt;
 };

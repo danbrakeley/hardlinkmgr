@@ -37,6 +37,7 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     m_proxy->setSourceModel(m_model);
 
     m_upButton = new QToolButton(this);
+    m_upButton->setObjectName(QStringLiteral("fbv.upButton"));
     m_upButton->setIcon(coloredIcon(QStringLiteral(":/icons/folder_parent.svg"),
                                     palette().color(QPalette::ButtonText),
                                     m_upButton->iconSize(), devicePixelRatioF()));
@@ -51,6 +52,7 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     });
 
     m_pathEdit = new QLineEdit(QStringLiteral("/"), this);
+    m_pathEdit->setObjectName(QStringLiteral("fbv.pathEdit"));
     connect(m_pathEdit, &QLineEdit::returnPressed,
             this, &FileBrowserView::onPathEdited);
 
@@ -69,10 +71,12 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     sortMenu->addSection(tr("Folders"));
     auto *foldersGroup = new QActionGroup(sortMenu);
     QAction *foldersOnTop = sortMenu->addAction(tr("Folders on Top"));
+    foldersOnTop->setObjectName(QStringLiteral("fbv.sortFoldersOnTop"));
     foldersOnTop->setCheckable(true);
     foldersOnTop->setChecked(true); // matches FileFilterProxyModel's default
     foldersGroup->addAction(foldersOnTop);
     QAction *foldersAmongFiles = sortMenu->addAction(tr("Folders Sorted with Files"));
+    foldersAmongFiles->setObjectName(QStringLiteral("fbv.sortFoldersAmongFiles"));
     foldersAmongFiles->setCheckable(true);
     foldersGroup->addAction(foldersAmongFiles);
     connect(foldersOnTop, &QAction::triggered, this, [this] { m_proxy->setFoldersFirst(true); });
@@ -81,10 +85,12 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     sortMenu->addSection(tr("Case"));
     auto *caseGroup = new QActionGroup(sortMenu);
     QAction *caseInsensitive = sortMenu->addAction(tr("Case-Insensitive"));
+    caseInsensitive->setObjectName(QStringLiteral("fbv.sortCaseInsensitive"));
     caseInsensitive->setCheckable(true);
     caseInsensitive->setChecked(true); // matches FileFilterProxyModel's default
     caseGroup->addAction(caseInsensitive);
     QAction *caseSensitive = sortMenu->addAction(tr("Case-Sensitive"));
+    caseSensitive->setObjectName(QStringLiteral("fbv.sortCaseSensitive"));
     caseSensitive->setCheckable(true);
     caseGroup->addAction(caseSensitive);
     connect(caseInsensitive, &QAction::triggered, this,
@@ -95,6 +101,7 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     m_sortButton->setMenu(sortMenu);
 
     m_filterEdit = new QLineEdit(this);
+    m_filterEdit->setObjectName(QStringLiteral("fbv.filterEdit"));
     m_filterEdit->setPlaceholderText(tr("Filter"));
     m_filterEdit->setClearButtonEnabled(true);
     connect(m_filterEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
@@ -103,8 +110,10 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     });
 
     m_countLabel = new QLabel(this);
+    m_countLabel->setObjectName(QStringLiteral("fbv.countLabel"));
 
     m_tree = new QTreeView(this);
+    m_tree->setObjectName(QStringLiteral("fbv.tree"));
     m_tree->setModel(m_proxy);
     m_tree->setRootIsDecorated(false);
     m_tree->setUniformRowHeights(true);

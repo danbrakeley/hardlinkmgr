@@ -39,5 +39,35 @@
     { "name": "windows-release", "configurePreset": "windows", "configuration": "Release" },
     { "name": "linux-debug",     "configurePreset": "linux-debug" },
     { "name": "linux-release",   "configurePreset": "linux-release" }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-unit",
+      "displayName": "Windows: serverless unit tests",
+      "configurePreset": "windows",
+      "configuration": "Debug",
+      "filter": { "include": { "label": "unit" } },
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "windows-all",
+      "displayName": "Windows: all tests (docker suites need the Samba fixture)",
+      "configurePreset": "windows",
+      "configuration": "Debug",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "linux-unit",
+      "displayName": "Linux: serverless unit tests",
+      "configurePreset": "linux-debug",
+      "filter": { "include": { "label": "unit" } },
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "linux-all",
+      "displayName": "Linux: all tests (docker suites need the Samba fixture)",
+      "configurePreset": "linux-debug",
+      "output": { "outputOnFailure": true }
+    }
   ]
 }

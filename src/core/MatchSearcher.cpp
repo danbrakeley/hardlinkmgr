@@ -1,7 +1,5 @@
 #include "MatchSearcher.h"
 
-#include <algorithm>
-
 #include "core/PathUtil.h"
 #include "smb/SmbSession.h"
 
@@ -11,14 +9,6 @@ namespace {
 // this sits well below FileBrowserView's stat bound; enough to keep the pipe
 // full on a LAN.
 constexpr int kMaxListsInFlight = 8;
-
-// Safety valves against pathological inputs (huge windows of equal-size
-// files). Hitting either reports the results as truncated.
-constexpr int kMaxMatches = 100000;
-constexpr qint64 kMaxPairsExamined = 20000000;
-
-// In-progress LinkRunner temporaries (see LinkRunner.cpp); never candidates.
-const QLatin1String kTmpSuffix(".hlmgr-tmp");
 
 bool isUnder(const QString &path, const QString &root)
 {
@@ -75,11 +65,11 @@ quint8 MatchSearcher::sideMaskOf(const QString &dirPath) const
     quint8 mask = 0;
     if (dirPath == m_options.primaryPath
         || (m_options.primaryRecursive && isUnder(dirPath, m_options.primaryPath))) {
-        mask |= kPrimary;
+        mask |= matchpairing::kPrimary;
     }
     if (dirPath == m_options.secondaryPath
         || (m_options.secondaryRecursive && isUnder(dirPath, m_options.secondaryPath))) {
-        mask |= kSecondary;
+        mask |= matchpairing::kSecondary;
     }
     return mask;
 }
@@ -131,7 +121,7 @@ void MatchSearcher::onDirectoryListed(const QString &path, const QList<FileEntry
                 enqueueDir(entryPath);
             }
         } else if (entry.size >= m_options.sizeMinBytes
-                   && !entry.name.endsWith(kTmpSuffix)) {
+                   && !matchpairing::isTmpName(entry.name)) {
             m_files.append({entryPath, entry.size, entry.inode, mask});
         }
     }
@@ -158,63 +148,18 @@ void MatchSearcher::onDirectoryListFailed(const QString &path, const QString &me
     pumpListings();
 }
 
-// Pure pairing over the gathered records: sort by size, then for each file
-// scan the window of files within sizeDiffBytes above it.
+// The pairing itself is pure and lives in core/MatchPairing.h.
 void MatchSearcher::computeMatches()
 {
     // Take everything the traversal gathered so the searcher is idle (and
     // restartable, even from a finished handler) before the signal goes out.
-    QList<FileRecord> files = std::move(m_files);
+    QList<matchpairing::FileRecord> files = std::move(m_files);
     const int folderErrors = m_folderErrors;
     resetState();
 
-    std::sort(files.begin(), files.end(),
-              [](const FileRecord &a, const FileRecord &b) { return a.size < b.size; });
-
-    QList<Match> matches;
-    qint64 pairsExamined = 0;
-    bool truncated = false;
-    for (int i = 0; i < files.size() && !truncated; ++i) {
-        const FileRecord &a = files.at(i);
-        for (int j = i + 1; j < files.size(); ++j) {
-            const FileRecord &b = files.at(j);
-            if (b.size - a.size > m_options.sizeDiffBytes) {
-                break; // sorted: everything further is too far apart
-            }
-            if (++pairsExamined > kMaxPairsExamined) {
-                truncated = true;
-                break;
-            }
-            if (a.path == b.path) {
-                continue;
-            }
-            if (a.inode != 0 && a.inode == b.inode) {
-                continue; // already hard-linked
-            }
-            // Exactly one row per unordered pair: prefer a as primary, and
-            // fall back to the flipped orientation (files in the overlap of
-            // both trees qualify either way; the first form wins).
-            if ((a.sides & kPrimary) && (b.sides & kSecondary)) {
-                matches.append({a.path, b.path, a.size, b.size});
-            } else if ((b.sides & kPrimary) && (a.sides & kSecondary)) {
-                matches.append({b.path, a.path, b.size, a.size});
-            } else {
-                continue;
-            }
-            if (matches.size() >= kMaxMatches) {
-                truncated = true;
-                break;
-            }
-        }
-    }
-
-    // Biggest potential savings first.
-    std::stable_sort(matches.begin(), matches.end(),
-                     [](const Match &a, const Match &b) {
-                         return a.primarySize > b.primarySize;
-                     });
-
-    emit finished(matches, folderErrors, truncated, /*cancelled*/ false);
+    const matchpairing::Result result =
+        matchpairing::computeMatches(std::move(files), m_options.sizeDiffBytes);
+    emit finished(result.matches, folderErrors, result.truncated, /*cancelled*/ false);
 }
 
 void MatchSearcher::resetState()

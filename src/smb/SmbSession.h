@@ -143,6 +143,7 @@ private:
     int m_statDelayMs = 0; // debug throttle, see HLM_STAT_DELAY_MS
     bool m_teardownPending = false;
     bool m_inTeardown = false;
+    bool m_inService = false; // inside smb2_service(); teardown must defer
     QString m_pendingError;
     QSet<ListRequest *> m_pendingLists;
     QSet<StatRequest *> m_pendingStats;

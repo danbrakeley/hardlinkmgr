@@ -36,6 +36,7 @@ HardLinkDialog::HardLinkDialog(SmbSession *session, const QList<SelectedFile> &f
     intro->setWordWrap(true);
 
     m_list = new QTreeWidget(this);
+    m_list->setObjectName(QStringLiteral("hld.list"));
     m_list->setColumnCount(4);
     m_list->setHeaderLabels({tr("Keep"), tr("File"), tr("Size / Links / Inode"), tr("Status")});
     m_list->setRootIsDecorated(false);
@@ -65,13 +66,16 @@ HardLinkDialog::HardLinkDialog(SmbSession *session, const QList<SelectedFile> &f
     });
 
     m_summaryLabel = new QLabel(this);
+    m_summaryLabel->setObjectName(QStringLiteral("hld.summaryLabel"));
     m_summaryLabel->setWordWrap(true);
 
     m_linkButton = new QPushButton(tr("Hard Link"), this);
+    m_linkButton->setObjectName(QStringLiteral("hld.linkButton"));
     m_linkButton->setEnabled(false); // until a primary is chosen
     connect(m_linkButton, &QPushButton::clicked, this, &HardLinkDialog::startLinking);
 
     m_closeButton = new QPushButton(tr("Cancel"), this);
+    m_closeButton->setObjectName(QStringLiteral("hld.closeButton"));
     connect(m_closeButton, &QPushButton::clicked, this, &QDialog::reject);
 
     auto *buttons = new QHBoxLayout;

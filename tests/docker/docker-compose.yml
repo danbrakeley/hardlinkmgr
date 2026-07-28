@@ -1,0 +1,23 @@
+# Samba test fixture for the docker-labeled ctest suites. Normally started and
+# stopped by ctest itself (see tests/CMakeLists.txt: samba_fixture_up/_down);
+# `docker compose up -d --wait` here works too for a long-lived dev fixture.
+#
+# The share lives on a NAMED VOLUME, never a bind mount: on Docker
+# Desktop (Windows/macOS) bind mounts sit on a host filesystem bridge where
+# hard links don't behave like a real Linux filesystem. Tests seed and verify
+# files with `docker exec` (see tests/common/SmbFixture.h).
+#
+# Host port 10445: Windows itself owns port 445. The app's URL syntax carries
+# the port: smb://hlmtest@localhost:10445/share (password: hlmtest).
+
+services:
+  samba:
+    build: .
+    container_name: hlm-test-samba
+    ports:
+      - "10445:445"
+    volumes:
+      - hlm_share:/srv/share
+
+volumes:
+  hlm_share:

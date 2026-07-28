@@ -39,10 +39,12 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
     m_connectAction = m_toolBar->addAction(QString());
+    m_connectAction->setObjectName(QStringLiteral("mw.connectAction"));
     connect(m_connectAction, &QAction::triggered,
         this, &MainWindow::onConnectActionTriggered);
 
     m_urlEdit = new QLineEdit(this);
+    m_urlEdit->setObjectName(QStringLiteral("mw.urlEdit"));
     m_urlEdit->setPlaceholderText(QStringLiteral("smb://user@host:port/share"));
     m_urlEdit->setClearButtonEnabled(true);
     m_urlEdit->setText(QSettings().value(QStringLiteral("connect/lastUrl")).toString());
@@ -58,6 +60,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_toolBar->addSeparator();
 
     m_linkAction = m_toolBar->addAction(tr("Link"));
+    m_linkAction->setObjectName(QStringLiteral("mw.linkAction"));
     m_linkAction->setEnabled(false); // needs >=2 files selected across the views
     m_linkAction->setToolTip(tr("Replace selected files with hard links (select at least two files)"));
     connect(m_linkAction, &QAction::triggered,
@@ -67,9 +70,30 @@ MainWindow::MainWindow(QWidget *parent)
     m_spinnerTimer->setInterval(80);
     connect(m_spinnerTimer, &QTimer::timeout, this, &MainWindow::advanceSpinner);
 
+    // Default password prompt: the modal dialog. Tests swap this out via
+    // setPasswordPrompt().
+    m_passwordPrompt = [this](const QString &shareDisplayName) -> std::optional<QString> {
+        bool ok = false;
+        const QString password = QInputDialog::getText(
+            this, tr("Connect to SMB Share"),
+            tr("Password for %1\n(leave empty if none is needed):").arg(shareDisplayName),
+            QLineEdit::Password, QString(), &ok);
+        if (!ok) {
+            return std::nullopt;
+        }
+        return password;
+    };
+
     statusBar(); // create it up front so messages have somewhere to go
     onSessionStateChanged(SmbSession::State::Disconnected); // creates the placeholder
     restoreWindowGeometry();
+}
+
+void MainWindow::setPasswordPrompt(PasswordPrompt prompt)
+{
+    if (prompt) {
+        m_passwordPrompt = std::move(prompt);
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -139,16 +163,12 @@ void MainWindow::onConnectActionTriggered()
             m_urlEdit->setFocus();
             return;
         }
-        bool ok = false;
-        const QString password = QInputDialog::getText(
-            this, tr("Connect to SMB Share"),
-            tr("Password for %1\n(leave empty if none is needed):").arg(spec->displayName()),
-            QLineEdit::Password, QString(), &ok);
-        if (!ok) {
-            return;
+        const std::optional<QString> password = m_passwordPrompt(spec->displayName());
+        if (!password) {
+            return; // prompt cancelled
         }
         m_shareDisplayName = spec->displayName();
-        m_session->connectToShare(*spec, password);
+        m_session->connectToShare(*spec, *password);
         break;
     }
     case SmbSession::State::Connecting:

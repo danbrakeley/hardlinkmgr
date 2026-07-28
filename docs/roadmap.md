@@ -14,8 +14,9 @@ Pri: 1 (highest) to 5 (lowest)
 
 | Pri | Name                                   | Notes                                                        |
 | --- | -------------------------------------- | ------------------------------------------------------------ |
-| 2   | Keep log/history of actions/errors     | Could be useful for debugging                                |
-| 3   | Build/release workflows                | right now I just build an EXE by hand, no releases           |
+| 1   | Testing                                | automatic testing against a test server                      |
+| 2   | Build/release workflows                | right now I just build an EXE by hand, no releases           |
+| 3   | Keep log/history of actions/errors     | Could be useful for debugging                                |
 | 4   | Link button is confusing               | is it?                                                       |
 | 5   | App Icon                               | Right now we have a generic app icon that looks ... generic. |
 | 5   | Do we need menus?                      | Why or why not?                                              |
