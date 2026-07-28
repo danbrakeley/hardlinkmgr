@@ -131,10 +131,13 @@ endif()
 # ---------------------------------------------------------------------------
 # Tests (ctest). BUILD_TESTING is ON by default via include(CTest); the suites
 # labeled "docker" additionally need the Samba fixture (see tests/docker/).
+# EXCLUDE_FROM_ALL keeps the tst_* executables off the default ALL target, so
+# an ordinary `cmake --build` (app dev loop, release packaging) only builds
+# hardlinkmgr — build the "hlm_tests" target first to run the suite.
 # ---------------------------------------------------------------------------
 include(CTest)
 if(BUILD_TESTING)
-  add_subdirectory(tests)
+  add_subdirectory(tests EXCLUDE_FROM_ALL)
 endif()
 
 # ---------------------------------------------------------------------------

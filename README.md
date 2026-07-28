@@ -94,14 +94,23 @@ packages and the binary runs in place — no deploy step.
 
 ## Tests
 
+The `tst_*` suites are excluded from the default `ALL` target (so an everyday
+`cmake --build` only builds the app), so build them explicitly before running
+`ctest`:
+
 ```powershell
+cmake --build --preset windows-debug --target tests/hlm_tests
 ctest --preset windows-unit    # serverless unit tests (< 1 s)
 ctest --preset windows-all     # everything, incl. integration/widget suites
 ```
 
-(`linux-unit` / `linux-all` on Linux.) The full run needs **Docker** with
-Compose v2: ctest builds and starts a Samba container (port 10445, share on a
-named volume), runs the SMB-backed suites against it, and tears it down.
-Without Docker on PATH those suites aren't registered and the unit tier still
-runs. Details — fixture layout, env overrides, what stays manual — in
-`docs/testing.md` and ADR 0004.
+(On Linux, `cmake --build --preset linux-debug --target hlm_tests`, then
+`linux-unit` / `linux-all`. Windows needs the `tests/` prefix on the target
+name — CMake's Visual Studio generator can't resolve a bare target name for a
+target defined in a subdirectory; Linux's Ninja generator doesn't need it.)
+
+The full run needs **Docker** with Compose v2: ctest builds and starts a Samba
+container (port 10445, share on a named volume), runs the SMB-backed suites
+against it, and tears it down. Without Docker on PATH those suites aren't
+registered and the unit tier still runs. Details — fixture layout, env
+overrides, what stays manual — in `docs/testing.md` and ADR 0004.

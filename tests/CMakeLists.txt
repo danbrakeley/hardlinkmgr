@@ -8,11 +8,18 @@
 
 find_package(Qt6 REQUIRED COMPONENTS Test)
 
+# Umbrella target so `cmake --build --preset <preset> --target hlm_tests`
+# builds every suite in one shot without pulling them into the default ALL
+# target (see EXCLUDE_FROM_ALL on add_subdirectory(tests) in the top-level
+# CMakeLists.txt).
+add_custom_target(hlm_tests)
+
 function(hlm_add_test name)
   cmake_parse_arguments(ARG "" "" "SOURCES;LABELS;FIXTURES" ${ARGN})
   qt_add_executable(${name} ${ARG_SOURCES})
   target_link_libraries(${name} PRIVATE hardlinkmgr_core Qt6::Test)
   target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  add_dependencies(hlm_tests ${name})
   add_test(NAME ${name} COMMAND ${name})
   set_tests_properties(${name} PROPERTIES LABELS "${ARG_LABELS}")
   if(ARG_FIXTURES)
