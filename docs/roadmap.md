@@ -2,9 +2,7 @@
 
 - [Overview of Problems](#overview-of-problems)
 - [Keep log/history of actions/errors](#keep-loghistory-of-actionserrors)
-- [Link button is confusing](#link-button-is-confusing)
 - [More general file management](#more-general-file-management)
-- [Do we need menus? Why?](#do-we-need-menus-why)
 - [Move counts from toolbar to status bar](#move-counts-from-toolbar-to-status-bar)
 - [**SHELVED FOR NOW** Tree view inside the table](#shelved-for-now-tree-view-inside-the-table)
 
@@ -14,38 +12,27 @@ Pri: 1 (highest) to 5 (lowest)
 
 | Pri | Name                                   | Notes                                                        |
 | --- | -------------------------------------- | ------------------------------------------------------------ |
-| 2   | Build/release workflows                | right now I just build an EXE by hand, no releases           |
-| 3   | Keep log/history of actions/errors     | Could be useful for debugging                                |
-| 4   | Link button is confusing               | is it?                                                       |
-| 5   | App Icon                               | Right now we have a generic app icon that looks ... generic. |
-| 5   | Do we need menus?                      | Why or why not?                                              |
+| 1   | Keep log/history of actions/errors     | Could be useful for debugging                                |
+| 2   | Link button is confusing               | Move it? Rename it? Remove it?                               |
+| 3   | App Icon                               | Right now we have a generic app icon that looks ... generic. |
+| 4   | Move counts from toolbar to status bar | UX cleanup, but would free up toolbar space if needed        |
 | 5   | More general file management           | ie rename/delete... need specific use case first             |
-| 5   | Move counts from toolbar to status bar | UX cleanup, but would free up toolbar space if needed        |
-| 5   | Parent folder icon doesn't read well   | Doesn't read as having to do with folder navigation          |
-| 5   | Toolbar toggle buttons don't read well | Toggle-ability and current state not obvious                 |
+| 5   | Icon pass                              | Icons have been improved, but do another pass                |
 | √   | ~~Improve finding matches~~            | **Match Finder shipped as Milestone 7 (2026-07-22)**         |
 | √   | ~~Testing~~                            | **Unit & Integration tests added 2026-07-28**                |
+| √   | ~~Build/release workflows~~            | **Github actions added 2026-07-28**                          |
 
 ## Keep log/history of actions/errors
 
 - keep a log file
-- every file action is slogged
+- every file action is logged
 - add a log viewer inside the app (in the Help menu?)
-
-## Link button is confusing
-
-- "Link" button is confusing: "Link Selected Files"? <-- too verbose?
 
 ## More general file management
 
 - Create new hard link to existing file
 - Delete file/folder
 - Rename file/folder
-
-## Do we need menus? Why?
-
-- Unclear if we need them. What would they provide that we don't already have?
-- What kind of expectations are there on macOS?
 
 ## Move counts from toolbar to status bar
 

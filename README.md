@@ -27,79 +27,53 @@ TODO: add some screen shots, maybe an animation, and maybe some short descriptio
 
 ## Build
 
-On every platform, libsmb2 is pulled from the patched fork via CMake
-`FetchContent`, so no manual checkout is needed.
+The included [`Makefile`](./Makefile) handles most common operations in a cross-platform way.
+
+```text
+$ make help
+Targets:
+  configure  - regenerate CMake's build files (run after editing CMakeLists.txt)
+  release    - build hardlinkmgr (Release, app only)
+  debug      - build hardlinkmgr (Debug, app only)
+  test-unit  - build + run the serverless unit suite
+  test-all   - build + run every suite (needs Docker)
+  clean      - remove the build/ directory
+```
+
+| command     | notes                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------- |
+| `configure` | Run this on a fresh sync or after a `clean`, or whenever `CMakeLists.txt` has changed. |
+| `release`   | Generates a release executable. If it fails, try `configure release`.                  |
+| `debug`     | Generates a debug executable. If it fails, try `configure debug`.                      |
+| `test-unit` | Builds and runs unit tests. Does not require Docker.                                   |
+| `test-all`  | Builds and runs unit tests + integration tests. Requires Docker.                       |
+| `clean`     | `rm -rf build`. You'll need to re-run `configure` after.                               |
 
 ### Windows
 
-Uses the MSVC Qt kit (see `docs/decisions/0001-choose-project-language.md`).
-Qt is found from the installed kit via the `windows` preset.
+Requires you to manually install Qt with the binaries compiled with MSVC. When I last did this, there was no preset I could use, I had to customize the install to get the MSVC binaries.
 
-First-time build (or any time after editing `CMakeLists.txt`), configure then build:
-
-```powershell
-cmake --preset windows
-cmake --build --preset windows-release
-# -> build\windows\bin\Release\hardlinkmgr.exe
-```
-
-For day-to-day builds where only source has changed, just rebuild:
-
-```powershell
-cmake --build --preset windows-release
-```
-
-Use `windows-debug` in place of `windows-release` for a debug build.
-
-The exe runs standalone: a post-build `windeployqt` step stages Qt's runtime DLLs
-and plugins next to it (it re-runs each build but no-ops when they're current), so
-no need to have Qt on `PATH`.
+Builds are found in `build\windows\bin\{Release|Debug}\hardlinkmgr.exe`. Required Qt .dlls are in the same folder.
 
 ### Linux
 
-Tested on Ubuntu 26.04. One-time setup on a fresh system (on top of `git`,
-`curl`, and `build-essential`):
+Installing dependencies depends on your linux flavor, but for Ubuntu 26.04, I did this:
 
 ```bash
-sudo apt install cmake ninja-build qt6-base-dev qt6-svg-dev qt6-wayland libgl1-mesa-dev
+sudo apt install git curl build-essential cmake ninja-build qt6-base-dev qt6-svg-dev qt6-wayland libgl1-mesa-dev
 ```
 
 - `cmake` + `ninja-build` — the `linux-*` presets use the Ninja generator.
-- `qt6-base-dev` — Qt Widgets/Network/Test development files (Qt 6.10 on
-  26.04); the Test module's CMake config ships in this package too, so no
-  separate package is needed to build the `tests/` suites.
-- `qt6-svg-dev` — Qt6::Svg development files (headers + CMake config), needed
-  for the toolbar/action icons. `qt6-base-dev` only pulls in the runtime
-  library (`libqt6svg6`), not this, so it must be listed explicitly.
-- `qt6-wayland` — Qt's Wayland platform plugin, so the app runs natively on
-  Ubuntu's default Wayland session.
+- `qt6-base-dev` — Qt Widgets/Network/Test development files (Qt 6.10 on 26.04); the Test module's CMake config ships in this package too, so no separate package is needed to build the `tests/` suites.
+- `qt6-svg-dev` — Qt6::Svg development files (headers + CMake config), needed for the toolbar/action icons. `qt6-base-dev` only pulls in the runtime library (`libqt6svg6`), not this, so it must be listed explicitly.
+- `qt6-wayland` — Qt's Wayland platform plugin, so the app runs natively on Ubuntu's default Wayland session.
 - `libgl1-mesa-dev` — OpenGL headers, required when linking against Qt6::Gui.
 
-The full test run (`linux-all`) additionally needs **Docker** with Compose v2
-on `PATH` (`sudo apt install docker.io docker-compose-v2`, or Docker Desktop);
-see the Tests section below.
-
-Configure then build (reconfigure only after `CMakeLists.txt` edits):
-
-```bash
-cmake --preset linux-release
-cmake --build --preset linux-release
-# -> build/linux-release/bin/hardlinkmgr
-```
-
-Use `linux-debug` in place of `linux-release` for a debug build; unlike the
-multi-config Windows preset, each Linux preset is single-config with its own
-build directory, so both coexist. Qt links dynamically against the system
-packages and the binary runs in place — no deploy step.
+Additionally, you'll need **Docker** with Compose v2 to run all the tests.
 
 ## Tests
 
-The `tst_*` suites are excluded from the default `ALL` target (so an everyday
-`cmake --build` only builds the app), so build them explicitly before running
-`ctest`. Two build targets: `hlm_tests_unit` (just the serverless "unit"-labeled
-suites, matching `ctest ... -unit`) and `hlm_tests` (everything, matching
-`ctest ... -all`) — build the smaller one if that's all you're about to run,
-it skips compiling the docker-fixture suites:
+The `tst_*` suites are excluded from the default `ALL` target (so an everyday `cmake --build` only builds the app), so build them explicitly before running `ctest`. Two build targets: `hlm_tests_unit` (just the serverless "unit"-labeled suites, matching `ctest ... -unit`) and `hlm_tests` (everything, matching `ctest ... -all`) — build the smaller one if that's all you're about to run, it skips compiling the docker-fixture suites:
 
 ```powershell
 cmake --build --preset windows-debug --target tests/hlm_tests_unit --parallel
@@ -109,14 +83,32 @@ cmake --build --preset windows-debug --target tests/hlm_tests --parallel
 ctest --preset windows-all     # everything, incl. integration/widget suites
 ```
 
-(On Linux, drop the `tests/` prefix — e.g. `cmake --build --preset
-linux-debug --target hlm_tests --parallel`, then `linux-unit` / `linux-all`.
-Windows needs that prefix because CMake's Visual Studio generator can't
-resolve a bare target name for a target defined in a subdirectory; Linux's
-Ninja generator doesn't need it.)
+(On Linux, drop the `tests/` prefix — e.g. `cmake --build --preset linux-debug --target hlm_tests --parallel`, then `linux-unit` / `linux-all`. Windows needs that prefix because CMake's Visual Studio generator can't resolve a bare target name for a target defined in a subdirectory; Linux's Ninja generator doesn't need it.)
 
-The full run needs **Docker** with Compose v2: ctest builds and starts a Samba
-container (port 10445, share on a named volume), runs the SMB-backed suites
-against it, and tears it down. Without Docker on PATH those suites aren't
-registered and the unit tier still runs. Details — fixture layout, env
-overrides, what stays manual — in `docs/testing.md` and ADR 0004.
+The full run needs **Docker** with Compose v2: ctest builds and starts a Samba container (port 10445, share on a named volume), runs the SMB-backed suites against it, and tears it down. Without Docker on PATH those suites aren't registered and the unit tier still runs. See [`docs/testing.md`](./docs/testing.md) and [ADR 4](./docs/decisions/0004-automated-test-architecture.md).
+
+## Cutting a release
+
+`.github/workflows/release.yml` builds Windows + Linux artifacts and, when triggered by a tag, attaches them to a GitHub Release. There's no separate version file — the version lives in one place, and the release is just a tag that matches it:
+
+1. Bump `VERSION` in the top-level `CMakeLists.txt`'s `project()` call (e.g. `VERSION 0.1.0` → `0.2.0`). This is the only place the version is defined — it flows into the Linux `.deb`'s filename via CPack (`CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT"`); the Windows zip's name (`hardlinkmgr-windows-x64.zip`) is unversioned by design, so nothing there needs touching.
+
+2. Commit that change and push it to `main` (or merge it in) — the tag in the next step must point at a commit that already has the bumped version, or the built `.deb` will carry the old version number.
+
+3. Tag the commit `vMAJOR.MINOR.PATCH`, matching the `CMakeLists.txt` value exactly (the workflow only triggers on a `v*` tag push; the version string itself isn't validated against the tag, so a mismatch won't fail the build — it'll just produce a confusingly-labeled `.deb`):
+
+   ```bash
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+4. Pushing the tag triggers the `windows` and `linux` jobs, then (only for a `v*` tag, not `workflow_dispatch`) the `release` job, which downloads both artifacts and publishes a GitHub Release with the zip and `.deb` attached. Watch it under the repo's **Actions** tab.
+
+5. If something's wrong with the build, delete the tag (locally and on the remote), fix it, and re-tag rather than reusing the same tag name:
+
+   ```bash
+   git tag -d v0.2.0
+   git push origin :refs/tags/v0.2.0
+   ```
+
+To test the build+package steps without creating a release (e.g. to check CI still passes before tagging), run the workflow manually from the Actions tab (`workflow_dispatch`) — same jobs, but the `release` job is skipped since there's no `v*` tag.
