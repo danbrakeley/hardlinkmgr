@@ -116,7 +116,15 @@ if(WIN32)
   target_link_libraries(hardlinkmgr_core PUBLIC ws2_32)
 endif()
 
-qt_add_executable(hardlinkmgr src/main.cpp)
+if(WIN32)
+  # app.rc embeds resources/icons/app/app.ico as the exe's icon (Explorer,
+  # taskbar, Start Menu, Alt-Tab) — generated from app256.png via ImageMagick
+  # (magick app256.png -define icon:auto-resize=256,48,32,16 app.ico),
+  # regenerate manually if the source art changes.
+  qt_add_executable(hardlinkmgr src/main.cpp resources/icons/app/app.rc)
+else()
+  qt_add_executable(hardlinkmgr src/main.cpp)
+endif()
 
 # GUI app (no console window); was a console app during early development.
 set_target_properties(hardlinkmgr PROPERTIES WIN32_EXECUTABLE ON)
@@ -164,8 +172,17 @@ if(UNIX AND NOT APPLE)
 
   install(TARGETS hardlinkmgr RUNTIME DESTINATION bin)
 
+  # Desktop entry + hicolor icon theme set (generated from
+  # resources/icons/app/app256.png via ImageMagick) so hardlinkmgr shows up
+  # with its icon in application launchers/menus. Depending on
+  # hicolor-icon-theme isn't declared explicitly: it's effectively universal
+  # on desktop Linux, and CPACK_DEBIAN_PACKAGE_SHLIBDEPS below only covers
+  # shared-library deps.
+  install(FILES resources/linux/hardlinkmgr.desktop DESTINATION share/applications)
+  install(DIRECTORY resources/icons/app/hicolor/ DESTINATION share/icons/hicolor)
+
   set(CPACK_GENERATOR "DEB")
-  set(CPACK_PACKAGE_CONTACT "Dan Brakeley <dan@brakeley.net>")
+  set(CPACK_PACKAGE_CONTACT "Dan Brakeley <deb@aliencamel.com>")
   set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
   set(CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT") # <name>_<version>_<arch>.deb
   include(CPack)
