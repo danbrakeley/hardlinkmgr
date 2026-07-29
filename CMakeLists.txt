@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(hardlinkmgr
-        VERSION 0.1.1
+        VERSION 0.1.2
         DESCRIPTION "GUI tool for manual SMB hard-link deduplication"
         LANGUAGES C CXX)
 
@@ -180,6 +180,12 @@ if(UNIX AND NOT APPLE)
   # shared-library deps.
   install(FILES resources/linux/hardlinkmgr.desktop DESTINATION share/applications)
   install(DIRECTORY resources/icons/app/hicolor/ DESTINATION share/icons/hicolor)
+
+  # AppStream MetaInfo: App Center's local-.deb install card (name + icon
+  # above the Install button) is built from this, not from the .desktop file
+  # or icon theme directly — without it, App Center shows a generic package
+  # icon even though the launcher/menu icon above is already correct.
+  install(FILES resources/linux/hardlinkmgr.metainfo.xml DESTINATION share/metainfo)
 
   set(CPACK_GENERATOR "DEB")
   set(CPACK_PACKAGE_CONTACT "Dan Brakeley <deb@aliencamel.com>")

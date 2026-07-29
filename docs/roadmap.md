@@ -10,17 +10,17 @@
 
 Pri: 1 (highest) to 5 (lowest)
 
-| Pri | Name                                   | Notes                                                        |
-| --- | -------------------------------------- | ------------------------------------------------------------ |
-| 1   | Keep log/history of actions/errors     | Could be useful for debugging                                |
-| 2   | Link button is confusing               | Move it? Rename it? Remove it?                               |
-| 3   | App Icon                               | Right now we have a generic app icon that looks ... generic. |
-| 4   | Move counts from toolbar to status bar | UX cleanup, but would free up toolbar space if needed        |
-| 5   | More general file management           | ie rename/delete... need specific use case first             |
-| 5   | Icon pass                              | Icons have been improved, but do another pass                |
-| √   | ~~Improve finding matches~~            | **Match Finder shipped as Milestone 7 (2026-07-22)**         |
-| √   | ~~Testing~~                            | **Unit & Integration tests added 2026-07-28**                |
-| √   | ~~Build/release workflows~~            | **Github actions added 2026-07-28**                          |
+| Pri | Name                                   | Notes                                                 |
+| --- | -------------------------------------- | ----------------------------------------------------- |
+| 1   | Keep log/history of actions/errors     | Could be useful for debugging                         |
+| 2   | Link button is confusing               | Move it? Rename it? Remove it?                        |
+| 4   | Move counts from toolbar to status bar | UX cleanup, but would free up toolbar space if needed |
+| 5   | More general file management           | ie rename/delete... need specific use case first      |
+| 5   | Icon pass                              | Icons have been improved, but do another pass         |
+| √   | ~~Improve finding matches~~            | **Match Finder shipped as Milestone 7 (2026-07-22)**  |
+| √   | ~~Testing~~                            | **Unit & Integration tests added 2026-07-28**         |
+| √   | ~~Build/release workflows~~            | **Github actions added 2026-07-28**                   |
+| √   | ~~App Icon~~                           | **Made an icon (NOT gen AI!) 2026-07-29**             |
 
 ## Keep log/history of actions/errors
 

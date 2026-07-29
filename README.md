@@ -20,9 +20,8 @@ TODO: add some screen shots, maybe an animation, and maybe some short descriptio
 
 ## Documents
 
-- [milestones.md](./docs/milestones.md) - The milestones to get the POC behavior up and running
-- [roadmap.md](./docs/roadmap.md) - Where this app is heading
 - [ADRs](./docs/decisions/) - Architectural Decision Records
+- [roadmap.md](./docs/roadmap.md) - Where this app is heading
 - [testing.md](./docs/testing.md) - List of intended behavior, in checklist form
 
 ## Build

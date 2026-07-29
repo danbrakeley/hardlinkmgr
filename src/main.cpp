@@ -26,6 +26,11 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName(QStringLiteral("brakeley"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("brakeley.net"));
     QCoreApplication::setApplicationName(QStringLiteral("hardlinkmgr"));
+    // On Wayland, GNOME Shell matches a running window to its .desktop entry
+    // (for the taskbar/alt-tab icon) via the xdg-toplevel app_id; Qt doesn't
+    // reliably derive that from applicationName(), so it must be set
+    // explicitly to match resources/linux/hardlinkmgr.desktop's install name.
+    QGuiApplication::setDesktopFileName(QStringLiteral("hardlinkmgr"));
 
     MainWindow window;
     window.show();
