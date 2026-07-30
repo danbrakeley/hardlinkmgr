@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+#include "ui/AboutDialog.h"
 #include "ui/FileBrowserView.h"
 #include "ui/HardLinkDialog.h"
 #include "ui/IconUtil.h"
@@ -65,6 +66,13 @@ MainWindow::MainWindow(QWidget *parent)
     m_linkAction->setToolTip(tr("Replace selected files with hard links (select at least two files)"));
     connect(m_linkAction, &QAction::triggered,
             this, &MainWindow::onLinkActionTriggered);
+
+    m_toolBar->addSeparator();
+
+    m_aboutAction = m_toolBar->addAction(tr("About"));
+    m_aboutAction->setObjectName(QStringLiteral("mw.aboutAction"));
+    connect(m_aboutAction, &QAction::triggered,
+            this, &MainWindow::onAboutActionTriggered);
 
     m_spinnerTimer = new QTimer(this);
     m_spinnerTimer->setInterval(80);
@@ -322,6 +330,12 @@ void MainWindow::onLinkActionTriggered()
             view->refresh();
         }
     }
+}
+
+void MainWindow::onAboutActionTriggered()
+{
+    AboutDialog dialog(this);
+    dialog.exec();
 }
 
 // A Match Finder result row was selected: the first view shows the primary

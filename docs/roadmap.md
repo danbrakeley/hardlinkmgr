@@ -1,6 +1,7 @@
 # Roadmap <!-- omit in toc -->
 
 - [Overview of Problems](#overview-of-problems)
+- [About dialog](#about-dialog)
 - [Keep log/history of actions/errors](#keep-loghistory-of-actionserrors)
 - [In-app display/browser for log/history](#in-app-displaybrowser-for-loghistory)
 - [More general file management](#more-general-file-management)
@@ -13,16 +14,36 @@ Pri: 1 (highest) to 5 (lowest)
 
 | Pri | Name                                   | Notes                                                 |
 | --- | -------------------------------------- | ----------------------------------------------------- |
-| 2   | Link button is confusing               | Move it? Rename it? Remove it?                        |
-| 3   | In-app display/browser for log/history | Should update live as things happen                   |
+| 3   | Starting search result paths           | default to following view?                            |
 | 4   | Move counts from toolbar to status bar | UX cleanup, but would free up toolbar space if needed |
+| 5   | Resizable columns in search results    |                                                       |
+| 5   | Link button is confusing               | Move it? Rename it? Remove it?                        |
+| 5   | In-app display/browser for log/history | Should update live as things happen                   |
 | 5   | More general file management           | ie rename/delete... need specific use case first      |
-| 5   | Icon pass                              | Icons have been improved, but do another pass         |
+| 5   | In-app icons                           | Icons have been improved, but do another pass         |
+| 5   | More appropriate file icons            | How much overhead does it add to use the OS icons?    |
 | √   | ~~Improve finding matches~~            | **Match Finder shipped as Milestone 7 (2026-07-22)**  |
 | √   | ~~Testing~~                            | **Unit & Integration tests added 2026-07-28**         |
 | √   | ~~Build/release workflows~~            | **Github actions added 2026-07-28**                   |
 | √   | ~~App Icon~~                           | **Made an icon (NOT gen AI!) 2026-07-29**             |
 | √   | ~~Keep log/history of actions/errors~~ | **Audit log shipped 2026-07-29**                      |
+| √   | ~~About dialog~~                       | **Shipped 2026-07-30**                                |
+
+## About dialog
+
+**Implemented 2026-07-30** (`src/ui/AboutDialog.{h,cpp}`, opened from the toolbar's About action in `MainWindow`). The spec below is kept as the reference for what it shows.
+
+- add a button to the far right of the main window toolbar that opens the About dialog
+- The About dialog should show:
+  - on the left
+    - the full sized (256x256) app icon
+  - on the right
+    - the full name: "Hard Link Manager"
+    - the version: e.g. "v0.1.2"
+  - under the app icon and name
+    - a copyright notice: "(C) Copyright 2026 Dan Brakeley"
+    - a link to the github page `github.com/danbrakeley/hardlinkmgr`
+    - an OK button that closes the dialog (the dialog also has a window title bar with an X that does the same thing)
 
 ## Keep log/history of actions/errors
 

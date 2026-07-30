@@ -74,6 +74,8 @@ qt_add_library(hardlinkmgr_core STATIC
   src/smb/SmbSession.cpp
   src/smb/SmbSession.h
   src/smb/SmbTypes.h
+  src/ui/AboutDialog.cpp
+  src/ui/AboutDialog.h
   src/ui/CheckBoxHeader.cpp
   src/ui/CheckBoxHeader.h
   src/ui/FileBrowserView.cpp
@@ -90,6 +92,10 @@ qt_add_library(hardlinkmgr_core STATIC
 )
 
 target_include_directories(hardlinkmgr_core PUBLIC src)
+
+# Feeds the About dialog's version label; PROJECT_VERSION is the single
+# source of truth set by project() above (see README's release steps).
+target_compile_definitions(hardlinkmgr_core PRIVATE APP_VERSION="${PROJECT_VERSION}")
 
 # AUTORCC: qt_standard_project_setup()/qt_add_library() only turn on AUTOMOC
 # by default, so resources/icons/icons.qrc needs this to actually be run

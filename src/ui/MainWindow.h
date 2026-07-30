@@ -41,6 +41,7 @@ private:
     void saveSplitterState();
     void onConnectActionTriggered();
     void onLinkActionTriggered();
+    void onAboutActionTriggered();
     void updateLinkAction();
     void addView();
     void onRevealRequested(const QString &primaryFolder, const QString &primaryName,
@@ -55,6 +56,7 @@ private:
     QLineEdit *m_urlEdit = nullptr;
     QAction *m_connectAction = nullptr;
     QAction *m_linkAction = nullptr;
+    QAction *m_aboutAction = nullptr;
     QLabel *m_centralLabel = nullptr;         // placeholder while not connected
     QSplitter *m_hSplitter = nullptr;         // central widget while connected
     QSplitter *m_splitter = nullptr;          // left side: the stacked views
