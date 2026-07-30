@@ -67,6 +67,8 @@ if(WIN32)
 endif()
 
 hlm_add_test(tst_smbsharespec         SOURCES unit/tst_smbsharespec.cpp         LABELS "unit")
+hlm_add_test(tst_logformat            SOURCES unit/tst_logformat.cpp            LABELS "unit")
+hlm_add_test(tst_logger               SOURCES unit/tst_logger.cpp               LABELS "unit")
 hlm_add_test(tst_matchpairing         SOURCES unit/tst_matchpairing.cpp         LABELS "unit")
 hlm_add_test(tst_matchconflicts       SOURCES unit/tst_matchconflicts.cpp       LABELS "unit")
 hlm_add_test(tst_filelistmodel        SOURCES unit/tst_filelistmodel.cpp        LABELS "unit")

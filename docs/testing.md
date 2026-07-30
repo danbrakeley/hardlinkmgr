@@ -85,3 +85,12 @@ Linux build (Ubuntu 26.04, setup per the Linux section of `README.md`).
 Match Finder: the search options + results panel right of the file views (design in `roadmap.md`, "Generate a list of potential matches"). **The link checks replace file contents by design — point the paths at throwaway copies.**
 
 - [ ] **Panel + splitter:** connect. The views sit left, the Match Finder panel right, in a resizable splitter. Drag the divider, disconnect, reconnect, then quit and relaunch — the position is restored each time. (automated: tst_mainwindow for the layout — divider drag/restore manual)
+
+## Audit log
+
+"Keep log/history of actions/errors" (roadmap): a jsonl audit trail of server writes, connects/disconnects, and errors, appended to `log.jsonl` in the app-data directory (`%LOCALAPPDATA%\brakeley\hardlinkmgr` on Windows, `~/.local/share/brakeley/hardlinkmgr` on Linux).
+
+- [x] **Line format:** every line is a single JSON object carrying `level` (`info`/`error` only), RFC 3339 UTC `time`, `msg`, and structured fields; awkward strings stay on one line. (automated: tst_logformat)
+- [x] **File behavior:** lines append across sessions, missing directories are created, no file is written until a path is set. (automated: tst_logger)
+- [x] **Link-run trail:** a successful link run logs its rename / hard link / unlink lines, in order, with the operations' paths. (automated: tst_linkrunner)
+- [ ] **On the real app:** connect, run one link, disconnect. The app-data `log.jsonl` gained connecting/connected, the three write lines, and disconnected — and no line contains the password. (manual)

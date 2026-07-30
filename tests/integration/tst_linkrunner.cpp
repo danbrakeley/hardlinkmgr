@@ -1,6 +1,11 @@
 #include <QtTest>
 
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QTemporaryDir>
+
 #include "core/LinkRunner.h"
+#include "core/Logger.h"
 #include "smb/SmbSession.h"
 
 #include "common/SmbFixture.h"
@@ -36,6 +41,7 @@ private:
     RunResult run(SmbSession &session, const QList<LinkRunner::Job> &jobs);
 
     SmbFixture m_fx;
+    QTemporaryDir m_logDir;
 };
 
 void TestLinkRunner::initTestCase()
@@ -73,6 +79,11 @@ void TestLinkRunner::happyPathSingleVictim()
     m_fx.seedFile(dir, "primary.bin", 100, 'p');
     m_fx.seedFile(dir, "victim.bin", 90, 'v');
 
+    // A successful run must leave a complete audit trail (docs/roadmap.md):
+    // capture this test's log lines in a file of their own.
+    const QString logPath = m_logDir.filePath("happy.jsonl");
+    Logger::instance().setFilePath(logPath);
+
     SmbSession session;
     QVERIFY(m_fx.connectForTest(session));
     const RunResult result =
@@ -93,6 +104,34 @@ void TestLinkRunner::happyPathSingleVictim()
     QCOMPARE(m_fx.readFile(dir + "/victim.bin"), QString(100, QLatin1Char('p')));
     // No leftover *.hlmgr-tmp.
     QCOMPARE(m_fx.ls(dir).filter("hlmgr-tmp").size(), 0);
+
+    // The audit trail holds the three server writes, in order, as info lines
+    // with the operations' paths (plus the connect lines around them).
+    Logger::instance().setFilePath(QString());
+    QFile logFile(logPath);
+    QVERIFY(logFile.open(QIODevice::ReadOnly));
+    QList<QJsonObject> writes;
+    for (const QByteArray &line : logFile.readAll().split('\n')) {
+        if (line.isEmpty()) {
+            continue;
+        }
+        const QJsonObject entry = QJsonDocument::fromJson(line).object();
+        QVERIFY2(!entry.isEmpty(), line.constData());
+        const QString msg = entry.value("msg").toString();
+        if (msg == "file renamed" || msg == "hard link created"
+            || msg == "file removed") {
+            QCOMPARE(entry.value("level").toString(), "info");
+            writes.append(entry);
+        }
+    }
+    QCOMPARE(writes.size(), 3);
+    QCOMPARE(writes[0].value("msg").toString(), "file renamed");
+    QCOMPARE(writes[0].value("from").toString(), dir + "/victim.bin");
+    QCOMPARE(writes[1].value("msg").toString(), "hard link created");
+    QCOMPARE(writes[1].value("existing").toString(), dir + "/primary.bin");
+    QCOMPARE(writes[1].value("new").toString(), dir + "/victim.bin");
+    QCOMPARE(writes[2].value("msg").toString(), "file removed");
+    QCOMPARE(writes[2].value("path").toString(), writes[0].value("to").toString());
 }
 
 void TestLinkRunner::multipleVictimsSequential()

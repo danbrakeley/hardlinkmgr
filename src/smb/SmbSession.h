@@ -10,6 +10,7 @@
 #include <optional>
 
 class QHostInfo;
+class QJsonObject;
 class QSocketNotifier;
 class QTimer;
 class QUrl;
@@ -37,6 +38,16 @@ struct SmbShareSpec
     QString displayName() const
     {
         return user + QLatin1Char('@') + hostPort() + QLatin1Char('/') + share;
+    }
+
+    // The connection's identity for the audit log, never with the password:
+    // "smb://[domain;]user@host[:port]/share".
+    QString url() const
+    {
+        const QString auth =
+            domain.isEmpty() ? user : domain + QLatin1Char(';') + user;
+        return QStringLiteral("smb://") + auth + QLatin1Char('@') + hostPort()
+               + QLatin1Char('/') + share;
     }
 
     // Returns std::nullopt and fills *errorMessage if the URL is not a valid
@@ -124,8 +135,11 @@ private:
     void onHostResolved(const QHostInfo &info);
     void startSmbConnect(const QString &server);
     void statFileNow(const QString &path);
-    quint64 failOpLater(const QString &message); // allocates an id, queues its failure
-    OpRequest *newOpRequest();
+    // Allocates an id, logs the failure, and queues its operationFailed().
+    quint64 failOpLater(const QString &failMsg, const QJsonObject &fields,
+                        const QString &message);
+    OpRequest *newOpRequest(const QString &okMsg, const QString &failMsg,
+                            const QJsonObject &fields);
     void service(int revents);
     void syncNotifiersToContext();
     void teardown();

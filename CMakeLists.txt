@@ -57,6 +57,9 @@ qt_standard_project_setup()
 qt_add_library(hardlinkmgr_core STATIC
   src/core/LinkRunner.cpp
   src/core/LinkRunner.h
+  src/core/LogFormat.h
+  src/core/Logger.cpp
+  src/core/Logger.h
   src/core/MatchConflicts.h
   src/core/MatchPairing.h
   src/core/MatchSearcher.cpp

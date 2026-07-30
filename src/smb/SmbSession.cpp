@@ -2,9 +2,12 @@
 
 #include <QHostAddress>
 #include <QHostInfo>
+#include <QJsonObject>
 #include <QSocketNotifier>
 #include <QTimer>
 #include <QUrl>
+
+#include "core/Logger.h"
 
 #include <smb2/smb2.h>      // must precede libsmb2.h: defines SMB2_GUID_SIZE, smb2_lease_key, etc.
 #include <smb2/libsmb2.h>
@@ -54,11 +57,15 @@ struct SmbSession::StatRequest
     struct smb2_stat_64 st;
 };
 
-// cb_data for an in-flight mutating operation (rename/link/unlink).
+// cb_data for an in-flight mutating operation (rename/link/unlink). Carries
+// the operation's audit-log identity so completion can log what changed.
 struct SmbSession::OpRequest
 {
     SmbSession *session;
     quint64 id;
+    QString okMsg;      // log msg on success, e.g. "file renamed"
+    QString failMsg;    // log msg on failure, e.g. "rename failed"
+    QJsonObject fields; // the operation's path(s)
 };
 
 std::optional<SmbShareSpec> SmbShareSpec::fromUrl(const QUrl &url, QString *errorMessage)
@@ -118,6 +125,29 @@ SmbSession::SmbSession(QObject *parent)
     m_tickTimer->setInterval(kTickIntervalMs);
     connect(m_tickTimer, &QTimer::timeout, this, [this] { service(0); });
 
+    // Audit-log every error signal here, in one place per signal, instead of
+    // at each emit site (docs/roadmap.md: log errors during connection or
+    // communication with a server).
+    connect(this, &SmbSession::errorOccurred, this, [this](const QString &message) {
+        Logger::instance().error(QStringLiteral("connection error"),
+                                 {{QStringLiteral("url"), m_spec.url()},
+                                  {QStringLiteral("error"), message}});
+    });
+    connect(this, &SmbSession::directoryListFailed, this,
+            [this](const QString &path, const QString &message) {
+        Logger::instance().error(QStringLiteral("directory listing failed"),
+                                 {{QStringLiteral("url"), m_spec.url()},
+                                  {QStringLiteral("path"), path},
+                                  {QStringLiteral("error"), message}});
+    });
+    connect(this, &SmbSession::statFailed, this,
+            [this](const QString &path, const QString &message) {
+        Logger::instance().error(QStringLiteral("stat failed"),
+                                 {{QStringLiteral("url"), m_spec.url()},
+                                  {QStringLiteral("path"), path},
+                                  {QStringLiteral("error"), message}});
+    });
+
     // Debug throttle for manual testing (docs/testing.md): a fast LAN server
     // answers stats too quickly to observe the lazy fill-in, so this delays
     // each stat by N ms before it is sent, simulating a slow server. Each
@@ -140,6 +170,8 @@ void SmbSession::connectToShare(const SmbShareSpec &spec, const QString &passwor
     m_spec = spec;
     m_password = password;
     setState(State::Connecting);
+    Logger::instance().info(QStringLiteral("connecting"),
+                            {{QStringLiteral("url"), m_spec.url()}});
 
     // Resolve the hostname with Qt's async lookup before handing it to
     // libsmb2: smb2_connect_share_async resolves synchronously (getaddrinfo),
@@ -230,6 +262,8 @@ void SmbSession::abortConnect()
     if (m_state != State::Connecting) {
         return;
     }
+    Logger::instance().info(QStringLiteral("connect aborted"),
+                            {{QStringLiteral("url"), m_spec.url()}});
     if (m_inService) {
         // See disconnectFromShare().
         m_teardownPending = true;
@@ -248,6 +282,8 @@ void SmbSession::disconnectFromShare()
     if (m_state != State::Connected) {
         return;
     }
+    Logger::instance().info(QStringLiteral("disconnected"),
+                            {{QStringLiteral("url"), m_spec.url()}});
     if (m_inService) {
         // Completion signals (directoryListed, operationSucceeded, ...) are
         // emitted from inside smb2_service(), so a handler reacting to one
@@ -395,28 +431,39 @@ void SmbSession::onStatDone(struct smb2_context *ctx, int status,
 // immediate failures — so callers can store the returned id before any
 // operationSucceeded/operationFailed for it can arrive.
 
-quint64 SmbSession::failOpLater(const QString &message)
+quint64 SmbSession::failOpLater(const QString &failMsg, const QJsonObject &fields,
+                                const QString &message)
 {
     const quint64 id = m_nextOpId++;
+    QJsonObject logFields = fields;
+    logFields.insert(QStringLiteral("url"), m_spec.url());
+    logFields.insert(QStringLiteral("error"), message);
+    Logger::instance().error(failMsg, logFields);
     QMetaObject::invokeMethod(this, [this, id, message] {
         emit operationFailed(id, message);
     }, Qt::QueuedConnection);
     return id;
 }
 
-SmbSession::OpRequest *SmbSession::newOpRequest()
+SmbSession::OpRequest *SmbSession::newOpRequest(const QString &okMsg,
+                                                const QString &failMsg,
+                                                const QJsonObject &fields)
 {
-    auto *request = new OpRequest{this, m_nextOpId++};
+    auto *request = new OpRequest{this, m_nextOpId++, okMsg, failMsg, fields};
     m_pendingOps.insert(request);
     return request;
 }
 
 quint64 SmbSession::renameFile(const QString &fromPath, const QString &toPath)
 {
+    const QString failMsg = QStringLiteral("rename failed");
+    const QJsonObject fields{{QStringLiteral("from"), fromPath},
+                             {QStringLiteral("to"), toPath}};
     if (m_state != State::Connected) {
-        return failOpLater(tr("Not connected."));
+        return failOpLater(failMsg, fields, tr("Not connected."));
     }
-    OpRequest *request = newOpRequest();
+    OpRequest *request =
+        newOpRequest(QStringLiteral("file renamed"), failMsg, fields);
     const quint64 id = request->id;
     if (smb2_rename_async(m_ctx, toSmbPath(fromPath).constData(),
                           toSmbPath(toPath).constData(),
@@ -424,7 +471,7 @@ quint64 SmbSession::renameFile(const QString &fromPath, const QString &toPath)
         const QString detail = QString::fromUtf8(smb2_get_error(m_ctx));
         m_pendingOps.remove(request);
         delete request;
-        return failOpLater(detail);
+        return failOpLater(failMsg, fields, detail);
     }
     syncNotifiersToContext();
     return id;
@@ -432,10 +479,14 @@ quint64 SmbSession::renameFile(const QString &fromPath, const QString &toPath)
 
 quint64 SmbSession::createHardLink(const QString &existingPath, const QString &newLinkPath)
 {
+    const QString failMsg = QStringLiteral("hard link failed");
+    const QJsonObject fields{{QStringLiteral("existing"), existingPath},
+                             {QStringLiteral("new"), newLinkPath}};
     if (m_state != State::Connected) {
-        return failOpLater(tr("Not connected."));
+        return failOpLater(failMsg, fields, tr("Not connected."));
     }
-    OpRequest *request = newOpRequest();
+    OpRequest *request =
+        newOpRequest(QStringLiteral("hard link created"), failMsg, fields);
     const quint64 id = request->id;
     // smb2_link is our fork's patch (see ADR 0001 / spikes/01_libsmb2); it
     // fails if newLinkPath already exists, which the dialog's rename-aside
@@ -446,7 +497,7 @@ quint64 SmbSession::createHardLink(const QString &existingPath, const QString &n
         const QString detail = QString::fromUtf8(smb2_get_error(m_ctx));
         m_pendingOps.remove(request);
         delete request;
-        return failOpLater(detail);
+        return failOpLater(failMsg, fields, detail);
     }
     syncNotifiersToContext();
     return id;
@@ -454,17 +505,20 @@ quint64 SmbSession::createHardLink(const QString &existingPath, const QString &n
 
 quint64 SmbSession::removeFile(const QString &path)
 {
+    const QString failMsg = QStringLiteral("remove failed");
+    const QJsonObject fields{{QStringLiteral("path"), path}};
     if (m_state != State::Connected) {
-        return failOpLater(tr("Not connected."));
+        return failOpLater(failMsg, fields, tr("Not connected."));
     }
-    OpRequest *request = newOpRequest();
+    OpRequest *request =
+        newOpRequest(QStringLiteral("file removed"), failMsg, fields);
     const quint64 id = request->id;
     if (smb2_unlink_async(m_ctx, toSmbPath(path).constData(),
                           &SmbSession::onOpDone, request) != 0) {
         const QString detail = QString::fromUtf8(smb2_get_error(m_ctx));
         m_pendingOps.remove(request);
         delete request;
-        return failOpLater(detail);
+        return failOpLater(failMsg, fields, detail);
     }
     syncNotifiersToContext();
     return id;
@@ -476,10 +530,20 @@ void SmbSession::onOpDone(struct smb2_context *ctx, int status,
     auto *request = static_cast<OpRequest *>(privateData);
     SmbSession *self = request->session;
     const quint64 id = request->id;
+    const QString okMsg = request->okMsg;
+    const QString failMsg = request->failMsg;
+    QJsonObject logFields = request->fields;
+    logFields.insert(QStringLiteral("url"), self->m_spec.url());
     self->m_pendingOps.remove(request);
     delete request;
 
     if (self->m_inTeardown) {
+        // The request died in the teardown flush, so the server may or may
+        // not have applied it — the log must record that the outcome is
+        // unknown, not claim failure.
+        logFields.insert(QStringLiteral("error"),
+                         QStringLiteral("disconnected before completion (outcome unknown)"));
+        Logger::instance().error(failMsg, logFields);
         // Emitting here would let a handler start the next operation against
         // the context that is mid-destruction; queue the failure instead so
         // it lands after teardown, when the state guards reject follow-ups.
@@ -494,10 +558,13 @@ void SmbSession::onOpDone(struct smb2_context *ctx, int status,
         if (detail.isEmpty()) {
             detail = QString::fromLocal8Bit(std::strerror(-status));
         }
+        logFields.insert(QStringLiteral("error"), detail);
+        Logger::instance().error(failMsg, logFields);
         emit self->operationFailed(id, detail);
         return;
     }
 
+    Logger::instance().info(okMsg, logFields);
     emit self->operationSucceeded(id);
 }
 
@@ -519,6 +586,8 @@ void SmbSession::onConnectDone(struct smb2_context *ctx, int status,
         self->m_teardownPending = true;
         return;
     }
+    Logger::instance().info(QStringLiteral("connected"),
+                            {{QStringLiteral("url"), self->m_spec.url()}});
     self->setState(State::Connected);
 }
 
