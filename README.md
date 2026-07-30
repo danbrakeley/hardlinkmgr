@@ -94,7 +94,7 @@ The full run needs **Docker** with Compose v2: ctest builds and starts a Samba c
 
 2. Commit that change and push it to `main` (or merge it in) — the tag in the next step must point at a commit that already has the bumped version, or the built `.deb` will carry the old version number.
 
-3. Tag the commit `vMAJOR.MINOR.PATCH`, matching the `CMakeLists.txt` value exactly (the workflow only triggers on a `v*` tag push; the version string itself isn't validated against the tag, so a mismatch won't fail the build — it'll just produce a confusingly-labeled `.deb`):
+3. Tag the commit `vMAJOR.MINOR.PATCH`, matching the `CMakeLists.txt` value exactly (the workflow only triggers on a `v*` tag push; its `check-version` job compares the tag against `CMakeLists.txt`'s `VERSION` and fails fast — before the windows/linux jobs spend runner time — if they don't match):
 
    ```bash
    git tag v0.2.0

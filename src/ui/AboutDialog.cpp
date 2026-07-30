@@ -7,6 +7,8 @@
 #include <QPixmap>
 #include <QVBoxLayout>
 
+#include "BuildInfo.h" // generated at build time; see cmake/GenerateBuildInfo.cmake
+
 AboutDialog::AboutDialog(QWidget *parent)
     : QDialog(parent)
 {
@@ -24,6 +26,9 @@ AboutDialog::AboutDialog(QWidget *parent)
     auto *versionLabel = new QLabel(tr("v%1").arg(QStringLiteral(APP_VERSION)), this);
     versionLabel->setObjectName(QStringLiteral("ad.versionLabel"));
 
+    auto *buildDateLabel = new QLabel(tr("Built %1").arg(QStringLiteral(APP_BUILD_DATE)), this);
+    buildDateLabel->setObjectName(QStringLiteral("ad.buildDateLabel"));
+
     auto *copyrightLabel = new QLabel(tr("© Copyright 2026 Dan Brakeley"), this);
 
     auto *githubLabel = new QLabel(
@@ -37,6 +42,7 @@ AboutDialog::AboutDialog(QWidget *parent)
     auto *textLayout = new QVBoxLayout;
     textLayout->addWidget(nameLabel);
     textLayout->addWidget(versionLabel);
+    textLayout->addWidget(buildDateLabel);
     textLayout->addSpacing(12);
     textLayout->addWidget(copyrightLabel);
     textLayout->addWidget(githubLabel);
