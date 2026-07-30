@@ -1,2 +1,10 @@
 /build/
 CMakeUserPresets.json
+
+# release.yml's windows job installs Qt via jurplel/install-qt-action with
+# dir: ${{ github.workspace }}/qt -- i.e. straight into the checkout. Left
+# untracked, that made `git status --porcelain` (cmake/GenerateBuildInfo.cmake's
+# dirty-check for the About dialog's version string) see it as uncommitted
+# changes on every Windows CI build, wrongly appending "-dev" even to a clean
+# tagged release.
+/qt/
