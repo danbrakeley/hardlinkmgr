@@ -65,6 +65,7 @@ qt_add_library(hardlinkmgr_core STATIC
   src/core/MatchSearcher.cpp
   src/core/MatchSearcher.h
   src/core/PathUtil.h
+  src/core/VersionCompare.h
   src/models/FileFilterProxyModel.cpp
   src/models/FileFilterProxyModel.h
   src/models/FileListModel.cpp

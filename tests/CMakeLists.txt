@@ -74,6 +74,7 @@ hlm_add_test(tst_matchconflicts       SOURCES unit/tst_matchconflicts.cpp       
 hlm_add_test(tst_filelistmodel        SOURCES unit/tst_filelistmodel.cpp        LABELS "unit")
 hlm_add_test(tst_filefilterproxymodel SOURCES unit/tst_filefilterproxymodel.cpp LABELS "unit")
 hlm_add_test(tst_matchresultsmodel    SOURCES unit/tst_matchresultsmodel.cpp    LABELS "unit")
+hlm_add_test(tst_versioncompare       SOURCES unit/tst_versioncompare.cpp       LABELS "unit")
 
 # Connect failures that need no server (bogus DNS, unroutable IP).
 hlm_add_test(tst_smbsession_offline

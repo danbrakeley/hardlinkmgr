@@ -3,11 +3,19 @@
 #include <QDialogButtonBox>
 #include <QFont>
 #include <QHBoxLayout>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QPixmap>
+#include <QPushButton>
 #include <QVBoxLayout>
 
 #include "BuildInfo.h" // generated at build time; see cmake/GenerateBuildInfo.cmake
+#include "core/VersionCompare.h"
 
 AboutDialog::AboutDialog(QWidget *parent)
     : QDialog(parent)
@@ -39,6 +47,62 @@ AboutDialog::AboutDialog(QWidget *parent)
     githubLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
     githubLabel->setOpenExternalLinks(true);
 
+    auto *checkUpdatesButton = new QPushButton(tr("Check for Updates"), this);
+    checkUpdatesButton->setObjectName(QStringLiteral("ad.checkUpdatesButton"));
+
+    auto *updateStatusLabel = new QLabel(this);
+    updateStatusLabel->setObjectName(QStringLiteral("ad.updateStatusLabel"));
+
+    connect(checkUpdatesButton, &QPushButton::clicked, this,
+            [this, checkUpdatesButton, updateStatusLabel]() {
+        checkUpdatesButton->setEnabled(false);
+        updateStatusLabel->setText(tr("Looking for updates..."));
+
+        auto *manager = new QNetworkAccessManager(this);
+
+        // Not /releases/latest: that endpoint only considers releases not
+        // marked "pre-release", and 404s if every release is (as they
+        // currently all are here) — the plain list is sorted newest-first
+        // and includes them.
+        QNetworkRequest request(
+            QUrl(QStringLiteral("https://api.github.com/repos/danbrakeley/hardlinkmgr/releases")));
+        // GitHub's API rejects requests with no User-Agent header (403).
+        request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("hardlinkmgr"));
+        request.setTransferTimeout(10000);
+
+        QNetworkReply *reply = manager->get(request);
+        connect(reply, &QNetworkReply::finished, this,
+                [reply, manager, checkUpdatesButton, updateStatusLabel]() {
+            reply->deleteLater();
+            manager->deleteLater();
+            checkUpdatesButton->setEnabled(true);
+
+            if (reply->error() != QNetworkReply::NoError) {
+                updateStatusLabel->setText(tr("Couldn't check for updates"));
+                return;
+            }
+
+            const QJsonArray releases = QJsonDocument::fromJson(reply->readAll()).array();
+            const QString tag = releases.isEmpty()
+                                     ? QString()
+                                     : releases.first().toObject().value(QStringLiteral("tag_name")).toString();
+            if (tag.isEmpty()) {
+                updateStatusLabel->setText(tr("Couldn't check for updates"));
+                return;
+            }
+
+            if (versioncompare::isNewer(tag, QStringLiteral(APP_VERSION))) {
+                updateStatusLabel->setText(tr("Update available: %1").arg(tag));
+            } else {
+                updateStatusLabel->setText(tr("Latest version: %1").arg(tag));
+            }
+        });
+    });
+
+    auto *updateRowLayout = new QVBoxLayout;
+    updateRowLayout->addWidget(checkUpdatesButton);
+    updateRowLayout->addWidget(updateStatusLabel);
+
     auto *textLayout = new QVBoxLayout;
     textLayout->addWidget(nameLabel);
     textLayout->addWidget(versionLabel);
@@ -46,6 +110,8 @@ AboutDialog::AboutDialog(QWidget *parent)
     textLayout->addSpacing(12);
     textLayout->addWidget(copyrightLabel);
     textLayout->addWidget(githubLabel);
+    textLayout->addSpacing(12);
+    textLayout->addLayout(updateRowLayout);
     textLayout->addStretch(1);
 
     auto *topLayout = new QHBoxLayout;
