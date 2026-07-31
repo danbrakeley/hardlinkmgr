@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(hardlinkmgr
-        VERSION 0.2.2
+        VERSION 0.2.3
         DESCRIPTION "GUI tool for manual SMB hard-link deduplication"
         LANGUAGES C CXX)
 
