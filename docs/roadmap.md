@@ -10,23 +10,25 @@
 
 Pri: 1 (highest) to 5 (lowest)
 
-| Pri | Name                                   | Notes                                                 |
-| --- | -------------------------------------- | ----------------------------------------------------- |
-| 2   | Detect when there's a newer version    |                                                       |
-| 3   | Starting search result paths           | default to following view?                            |
-| 4   | Move counts from toolbar to status bar | UX cleanup, but would free up toolbar space if needed |
-| 5   | Resizable columns in search results    |                                                       |
-| 5   | Link button is confusing               | Move it? Rename it? Remove it?                        |
-| 5   | In-app display/browser for log/history | Should update live as things happen                   |
-| 5   | More general file management           | ie rename/delete... need specific use case first      |
-| 5   | In-app icons                           | Icons have been improved, but do another pass         |
-| 5   | More appropriate file icons            | How much overhead does it add to use the OS icons?    |
-| √   | ~~Improve finding matches~~            | **Match Finder shipped as Milestone 7 (2026-07-22)**  |
-| √   | ~~Testing~~                            | **Unit & Integration tests added 2026-07-28**         |
-| √   | ~~Build/release workflows~~            | **Github actions added 2026-07-28**                   |
-| √   | ~~App Icon~~                           | **Made an icon (NOT gen AI!) 2026-07-29**             |
-| √   | ~~Keep log/history of actions/errors~~ | **Audit log shipped 2026-07-29**                      |
-| √   | ~~About dialog~~                       | **Shipped 2026-07-30**                                |
+| Pri | Name                                    | Notes                                                 |
+| --- | --------------------------------------- | ----------------------------------------------------- |
+| 2   | Move counts from toolbar to status bar  | UX cleanup, but would free up toolbar space if needed |
+| 3   | More appropriate file icons             | How much overhead does it add to use the OS icons?    |
+| 3   | Add new mode for finding links          | In a tab with the Match Finder?                       |
+| 3   | Add new mode for creating new links     | Maybe in a tab with the Match Finder?                 |
+| 4   | Starting search result paths            | default to following view?                            |
+| 5   | Resizable columns in search results     |                                                       |
+| 5   | Link button is confusing                | Move it? Rename it? Remove it?                        |
+| 5   | In-app display/browser for log/history  | Should update live as things happen                   |
+| 5   | More general file management            | ie rename/delete... need specific use case first      |
+| 5   | In-app icons                            | Icons have been improved, but do another pass         |
+| √   | ~~Improve finding matches~~             | **Match Finder shipped as Milestone 7 (2026-07-22)**  |
+| √   | ~~Testing~~                             | **Unit & Integration tests added 2026-07-28**         |
+| √   | ~~Build/release workflows~~             | **Github actions added 2026-07-28**                   |
+| √   | ~~App Icon~~                            | **Made an icon (NOT gen AI!) 2026-07-29**             |
+| √   | ~~Keep log/history of actions/errors~~  | **Audit log shipped 2026-07-29**                      |
+| √   | ~~About dialog~~                        | **Shipped 2026-07-30**                                |
+| √   | ~~Detect when there's a newer version~~ | **About Dialog can do a manual check 2026-07-30**     |
 
 ## In-app display/browser for log/history
 
@@ -47,7 +49,7 @@ Pri: 1 (highest) to 5 (lowest)
 ```text
 
 +---------------------------------------------------------------------+
-| ^ | /path/to/current/folder           | @@ | Aa | Filter        | X |
+| ^ | /path/to/current/folder              | @@ | Aa | Filter         |
 +---------------------------------------------------------------------+
 |   | Name                          | Size | Modified | Links | Inode |
 | I | Folder A                      | #    | {date}   | #     | #     |
@@ -71,7 +73,7 @@ I want to be able to see the child files/folders in each visible folder (depth o
 What we currently have:
 
 +---------------------------------------------------------------------+
-| ^ | /path/to/current/folder           | @@ | Aa | Filter    | # | X |
+| ^ | /path/to/current/folder               | @@ | Aa | Filter    | # |
 +---------------------------------------------------------------------+
 |   | Name                          | Size | Modified | Links | Inode |
 | I | Folder A                      | #    | {date}   | #     | #     |
@@ -85,7 +87,7 @@ What I'm thinking:
 1. Folders all start collapsed:
 
 +---------------------------------------------------------------------+
-| ^ | /path/to/current/folder           | @@ | Aa | Filter    | # | X |
+| ^ | /path/to/current/folder               | @@ | Aa | Filter    | # |
 +---------------------------------------------------------------------+
 |   |+/-| Name                      | Size | Modified | Links | Inode |
 | I | + | Folder A                  | #    | {date}   | #     | #     |
@@ -97,7 +99,7 @@ What I'm thinking:
 2. Folders can be expanded:
 
 +---------------------------------------------------------------------+
-| ^ | /path/to/current/folder           | @@ | Aa | Filter    | # | X |
+| ^ | /path/to/current/folder               | @@ | Aa | Filter    | # |
 +---------------------------------------------------------------------+
 |   |+/-| Name                      | Size | Modified | Links | Inode |
 | I | - | Folder A                  | #    | {date}   | #     | #     |
