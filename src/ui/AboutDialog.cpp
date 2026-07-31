@@ -52,6 +52,9 @@ AboutDialog::AboutDialog(QWidget *parent)
 
     auto *updateStatusLabel = new QLabel(this);
     updateStatusLabel->setObjectName(QStringLiteral("ad.updateStatusLabel"));
+    updateStatusLabel->setTextFormat(Qt::RichText);
+    updateStatusLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    updateStatusLabel->setOpenExternalLinks(true);
 
     connect(checkUpdatesButton, &QPushButton::clicked, this,
             [this, checkUpdatesButton, updateStatusLabel]() {
@@ -91,10 +94,13 @@ AboutDialog::AboutDialog(QWidget *parent)
                 return;
             }
 
+            const QString tagLink =
+                tr("<a href=\"https://github.com/danbrakeley/hardlinkmgr/releases/tag/%1\">%1</a>").arg(tag.toHtmlEscaped());
+
             if (versioncompare::isNewer(tag, QStringLiteral(APP_VERSION))) {
-                updateStatusLabel->setText(tr("Update available: %1").arg(tag));
+                updateStatusLabel->setText(tr("Update available: %1").arg(tagLink));
             } else {
-                updateStatusLabel->setText(tr("Latest version: %1").arg(tag));
+                updateStatusLabel->setText(tr("Latest version: %1").arg(tagLink));
             }
         });
     });

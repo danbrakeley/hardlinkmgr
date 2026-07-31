@@ -1,10 +1,24 @@
-# Hard Link Manager
+# Hard Link Manager <!-- omit in toc -->
+
+- [Original Problem](#original-problem)
+- [Constraints](#constraints)
+- [Screenshot](#screenshot)
+- [Documents](#documents)
+- [Build](#build)
+  - [Windows](#windows)
+  - [Linux](#linux)
+- [Tests](#tests)
+- [Cutting a release](#cutting-a-release)
 
 ## Original Problem
 
-I ended up in the position where I had a remote SMB file share with multiple copies of the same large files. The file names didn't match, and in some cases the file sizes didn't match either, and I wanted a way to identify two (or more) files by hand, then [hard link](https://en.wikipedia.org/wiki/Hard_link) them to each other to avoid wasting space.
+I've got an SMB share with large files that never change, but there are some copies of the same file in different folders with different names, and because the files are large, this wastes a lot of disk space. So I wanted to find these duplicate files, and use [hard links](https://en.wikipedia.org/wiki/Hard_link) to force them both to use the same bytes on disk.
 
-While there are existing applications to identify duplicates and replace them with hard links (i.e. [jdupes](https://codeberg.org/jbruchon/jdupes)), my situation involved files that didn't always have exactly the same size, but I generally knew where to find the two files, and just wanted a way to help me locate known duplicates and then explicitly hard link them to the same bytes.
+There are command line solutions that will do this (e.g. [jdupes](https://codeberg.org/jbruchon/jdupes)), but I wanted a different experience, including:
+
+1. to connect as an SMB client, and not require SSH access, especially not if it also meant running as root.
+2. to not bypass existing NAS security/safety features, like Synology's Recycle Bin.
+3. to avoid reading file contents for large files, and instead rely on a human who can quickly tell from the file names which files are the same.
 
 ## Constraints
 
@@ -12,17 +26,19 @@ While there are existing applications to identify duplicates and replace them wi
 - App starts instantly (lightweight)
 - Low resource usage
 - Cross platform (Windows & Linux required, macOS is nice-to-have)
-- Looks and feels like a native app on each platform (OS has good solutions for hotkeys/UX, don't re-invent the wheel)
+- Looks and feels like a native app on each platform, using native widget hotkeys/UX.
 
-## UI/UX
+## Screenshot
 
-TODO: add some screen shots, maybe an animation, and maybe some short descriptions.
+Here's what v0.2.2 looks like in action, with the list of matches on the right, and on the left you have views into the SMB share's file system with specifics about each file in the match.
+
+![a screenshot of the app running on Windows](./docs/screenshot-v0.2.2.png)
 
 ## Documents
 
 - [ADRs](./docs/decisions/) - Architectural Decision Records
 - [roadmap.md](./docs/roadmap.md) - Where this app is heading
-- [testing.md](./docs/testing.md) - List of intended behavior, in checklist form
+- [testing.md](./docs/testing.md) - Checklist of things not covered by automated tests
 
 ## Build
 
