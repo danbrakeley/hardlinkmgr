@@ -9,6 +9,7 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QScrollBar>
+#include <QStatusBar>
 #include <QToolButton>
 #include <QTreeView>
 #include <QVBoxLayout>
@@ -106,11 +107,9 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     m_filterEdit->setClearButtonEnabled(true);
     connect(m_filterEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
         m_proxy->setFilterFixedString(text);
-        updateCountLabel();
+        updateStatusBar();
+        updateSelectedCount(); // filtering can drop selected rows out of view
     });
-
-    m_countLabel = new QLabel(this);
-    m_countLabel->setObjectName(QStringLiteral("fbv.countLabel"));
 
     m_tree = new QTreeView(this);
     m_tree->setObjectName(QStringLiteral("fbv.tree"));
@@ -125,8 +124,10 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     m_tree->sortByColumn(FileListModel::NameColumn, Qt::AscendingOrder);
     connect(m_tree, &QTreeView::activated,
             this, &FileBrowserView::onEntryActivated);
-    connect(m_tree->selectionModel(), &QItemSelectionModel::selectionChanged,
-            this, [this] { emit selectionChanged(); });
+    connect(m_tree->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this] {
+        updateSelectedCount();
+        emit selectionChanged();
+    });
 
     QHeaderView *header = m_tree->header();
     header->setStretchLastSection(false);
@@ -140,12 +141,25 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     toolbarLayout->addWidget(m_pathEdit, /*stretch*/ 3);
     toolbarLayout->addWidget(m_sortButton);
     toolbarLayout->addWidget(m_filterEdit, /*stretch*/ 1);
-    toolbarLayout->addWidget(m_countLabel);
+
+    m_statusBar = new QStatusBar(this);
+    m_statusBar->setObjectName(QStringLiteral("fbv.statusBar"));
+    m_statusBar->setSizeGripEnabled(false);
+    m_selectedLabel = new QLabel(m_statusBar);
+    m_selectedLabel->setObjectName(QStringLiteral("fbv.selectedLabel"));
+    m_visibleLabel = new QLabel(m_statusBar);
+    m_visibleLabel->setObjectName(QStringLiteral("fbv.visibleLabel"));
+    m_totalLabel = new QLabel(m_statusBar);
+    m_totalLabel->setObjectName(QStringLiteral("fbv.totalLabel"));
+    m_statusBar->addPermanentWidget(m_selectedLabel);
+    m_statusBar->addPermanentWidget(m_visibleLabel);
+    m_statusBar->addPermanentWidget(m_totalLabel);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(4, 4, 4, 4);
     layout->addLayout(toolbarLayout);
     layout->addWidget(m_tree);
+    layout->addWidget(m_statusBar);
 
     connect(m_session, &SmbSession::directoryListed,
             this, &FileBrowserView::onDirectoryListed);
@@ -161,7 +175,8 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     connect(m_tree->verticalScrollBar(), &QScrollBar::valueChanged,
             this, [this] { pumpStats(); });
 
-    updateCountLabel();
+    updateStatusBar();
+    updateSelectedCount();
 }
 
 QList<SelectedFile> FileBrowserView::selectedFiles() const
@@ -230,7 +245,7 @@ void FileBrowserView::onDirectoryListed(const QString &path, const QList<FileEnt
     m_pathEdit->setText(path);
     m_upButton->setEnabled(path != QLatin1String("/"));
     m_model->setEntries(entries);
-    updateCountLabel();
+    updateStatusBar();
     resetStatQueue();
     if (!m_pendingReveal.isEmpty()) {
         revealByName(m_pendingReveal);
@@ -238,6 +253,7 @@ void FileBrowserView::onDirectoryListed(const QString &path, const QList<FileEnt
     }
     // The model reset cleared the selection without a selectionChanged signal
     // (QItemSelectionModel::reset is documented not to emit); tell listeners.
+    updateSelectedCount();
     emit selectionChanged();
 }
 
@@ -366,10 +382,13 @@ int FileBrowserView::nextStatRow()
     return -1;
 }
 
-void FileBrowserView::updateCountLabel()
+void FileBrowserView::updateStatusBar()
 {
-    const int total = m_model->rowCount();
-    m_countLabel->setText(m_filterEdit->text().isEmpty()
-                              ? QString::number(total)
-                              : tr("%1 / %2").arg(m_proxy->rowCount()).arg(total));
+    m_visibleLabel->setText(tr("Visible: %1").arg(m_proxy->rowCount()));
+    m_totalLabel->setText(tr("Total: %1").arg(m_model->rowCount()));
+}
+
+void FileBrowserView::updateSelectedCount()
+{
+    m_selectedLabel->setText(tr("Selected: %1").arg(m_tree->selectionModel()->selectedRows().size()));
 }

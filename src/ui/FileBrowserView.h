@@ -10,6 +10,7 @@ class QItemSelectionModel;
 class QLabel;
 class QLineEdit;
 class QModelIndex;
+class QStatusBar;
 class QToolButton;
 class QTreeView;
 
@@ -24,9 +25,9 @@ struct SelectedFile
     FileEntry entry;
 };
 
-// One filesystem view: path box, case-insensitive filter box,
-// "matches / total" label, and the file table. The full listing stays in
-// memory; the proxy decides what is shown.
+// One filesystem view: path box, case-insensitive filter box, and the file
+// table, with a status bar below showing Selected/Visible/Total counts. The
+// full listing stays in memory; the proxy decides what is shown.
 class FileBrowserView : public QWidget
 {
     Q_OBJECT
@@ -57,7 +58,8 @@ private:
     void onDirectoryListFailed(const QString &path, const QString &message);
     void onFileStatted(const QString &path, int nlink, quint64 inode);
     void onStatFailed(const QString &path, const QString &message);
-    void updateCountLabel();
+    void updateStatusBar();
+    void updateSelectedCount();
 
     QString entryPath(const QString &name) const;
     void revealByName(const QString &fileName);
@@ -73,7 +75,10 @@ private:
     QLineEdit *m_pathEdit = nullptr;
     QToolButton *m_sortButton = nullptr;
     QLineEdit *m_filterEdit = nullptr;
-    QLabel *m_countLabel = nullptr;
+    QStatusBar *m_statusBar = nullptr;
+    QLabel *m_selectedLabel = nullptr;
+    QLabel *m_visibleLabel = nullptr;
+    QLabel *m_totalLabel = nullptr;
     QString m_currentPath;   // last successfully listed path
     QString m_pendingPath;   // path of the in-flight listing, empty if none
     QString m_pendingReveal; // file to select once the pending listing lands

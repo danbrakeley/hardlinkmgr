@@ -24,11 +24,11 @@ class TestFileBrowserView : public QObject
 
 private slots:
     void initTestCase();
-    void listsDirectoryAndCountLabel();
+    void listsDirectoryAndStatusBar();
     void navigationByActivationAndPathBox();
     void badPathReverts();
     void upButton();
-    void filterUpdatesCountLabel();
+    void filterAndSelectionUpdateStatusBar();
     void statPumpFillsAndDrains();
     void navigationCancelsFill();
     void disconnectMidFill();
@@ -53,7 +53,7 @@ QString TestFileBrowserView::linksTextAt(QTreeView *tree, int proxyRow)
         .toString();
 }
 
-void TestFileBrowserView::listsDirectoryAndCountLabel()
+void TestFileBrowserView::listsDirectoryAndStatusBar()
 {
     const QString dir = m_fx.makeCaseDir("browse");
     m_fx.seedFile(dir, "one.bin", 100);
@@ -72,8 +72,9 @@ void TestFileBrowserView::listsDirectoryAndCountLabel()
     // Folders group on top under the default name sort.
     QCOMPARE(tree->model()->index(0, FileListModel::NameColumn).data().toString(),
              "sub");
-    // The plain total shows while no filter is set.
-    QCOMPARE(view.findChild<QLabel *>("fbv.countLabel")->text(), "3");
+    QCOMPARE(view.findChild<QLabel *>("fbv.visibleLabel")->text(), "Visible: 3");
+    QCOMPARE(view.findChild<QLabel *>("fbv.totalLabel")->text(), "Total: 3");
+    QCOMPARE(view.findChild<QLabel *>("fbv.selectedLabel")->text(), "Selected: 0");
     QCOMPARE(view.findChild<QLineEdit *>("fbv.pathEdit")->text(), dir);
 }
 
@@ -149,7 +150,7 @@ void TestFileBrowserView::upButton()
     QTRY_COMPARE(view.currentPath(), dir); // immediate parent
 }
 
-void TestFileBrowserView::filterUpdatesCountLabel()
+void TestFileBrowserView::filterAndSelectionUpdateStatusBar()
 {
     const QString dir = m_fx.makeCaseDir("filter");
     m_fx.seedFile(dir, "alpha.bin", 10);
@@ -163,18 +164,32 @@ void TestFileBrowserView::filterUpdatesCountLabel()
     QTRY_COMPARE(view.currentPath(), dir);
 
     auto *filterEdit = view.findChild<QLineEdit *>("fbv.filterEdit");
-    auto *countLabel = view.findChild<QLabel *>("fbv.countLabel");
+    auto *selectedLabel = view.findChild<QLabel *>("fbv.selectedLabel");
+    auto *visibleLabel = view.findChild<QLabel *>("fbv.visibleLabel");
+    auto *totalLabel = view.findChild<QLabel *>("fbv.totalLabel");
     auto *tree = view.findChild<QTreeView *>("fbv.tree");
 
-    QCOMPARE(countLabel->text(), "3");
+    QCOMPARE(visibleLabel->text(), "Visible: 3");
+    QCOMPARE(totalLabel->text(), "Total: 3");
 
     filterEdit->setText("beta"); // case-insensitive substring
     QCOMPARE(tree->model()->rowCount(), 2);
-    QCOMPARE(countLabel->text(), "2 / 3");
+    QCOMPARE(visibleLabel->text(), "Visible: 2");
+    QCOMPARE(totalLabel->text(), "Total: 3");
 
     filterEdit->clear();
     QCOMPARE(tree->model()->rowCount(), 3);
-    QCOMPARE(countLabel->text(), "3");
+    QCOMPARE(visibleLabel->text(), "Visible: 3");
+    QCOMPARE(totalLabel->text(), "Total: 3");
+
+    QCOMPARE(selectedLabel->text(), "Selected: 0");
+    tree->setCurrentIndex(tree->model()->index(0, 0));
+    QCOMPARE(selectedLabel->text(), "Selected: 1");
+
+    // Navigating away resets the selection along with the listing.
+    view.navigateTo(dir + "/..");
+    QTRY_VERIFY(view.currentPath() != dir);
+    QCOMPARE(selectedLabel->text(), "Selected: 0");
 }
 
 void TestFileBrowserView::statPumpFillsAndDrains()
