@@ -2,13 +2,16 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QFontMetrics>
 #include <QItemSelectionModel>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
 #include <QScrollBar>
+#include <QStatusBar>
 #include <QToolButton>
 #include <QTreeView>
 #include <QVBoxLayout>
@@ -100,17 +103,43 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
 
     m_sortButton->setMenu(sortMenu);
 
+    m_viewButton = new QToolButton(this);
+    m_viewButton->setIcon(coloredIcon(QStringLiteral(":/icons/content_view.svg"),
+                                      palette().color(QPalette::ButtonText),
+                                      m_viewButton->iconSize(), devicePixelRatioF()));
+    m_viewButton->setText(tr("View"));
+    m_viewButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_viewButton->setToolTip(tr("Icon options"));
+    m_viewButton->setAutoRaise(true);
+    m_viewButton->setPopupMode(QToolButton::InstantPopup);
+
+    auto *viewMenu = new QMenu(m_viewButton);
+    auto *iconModeGroup = new QActionGroup(viewMenu);
+    m_viewIconsOsAction = viewMenu->addAction(tr("Use OS file-type icons"));
+    m_viewIconsOsAction->setObjectName(QStringLiteral("fbv.viewIconsOs"));
+    m_viewIconsOsAction->setCheckable(true);
+    m_viewIconsOsAction->setChecked(true); // matches FileListModel's default
+    iconModeGroup->addAction(m_viewIconsOsAction);
+    m_viewIconsGenericAction = viewMenu->addAction(tr("Use generic icon"));
+    m_viewIconsGenericAction->setObjectName(QStringLiteral("fbv.viewIconsGeneric"));
+    m_viewIconsGenericAction->setCheckable(true);
+    iconModeGroup->addAction(m_viewIconsGenericAction);
+    connect(m_viewIconsOsAction, &QAction::triggered, this,
+            [this] { emit iconModeChangeRequested(FileListModel::IconMode::Os); });
+    connect(m_viewIconsGenericAction, &QAction::triggered, this,
+            [this] { emit iconModeChangeRequested(FileListModel::IconMode::Generic); });
+
+    m_viewButton->setMenu(viewMenu);
+
     m_filterEdit = new QLineEdit(this);
     m_filterEdit->setObjectName(QStringLiteral("fbv.filterEdit"));
     m_filterEdit->setPlaceholderText(tr("Filter"));
     m_filterEdit->setClearButtonEnabled(true);
     connect(m_filterEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
         m_proxy->setFilterFixedString(text);
-        updateCountLabel();
+        updateStatusBar();
+        updateSelectedCount(); // filtering can drop selected rows out of view
     });
-
-    m_countLabel = new QLabel(this);
-    m_countLabel->setObjectName(QStringLiteral("fbv.countLabel"));
 
     m_tree = new QTreeView(this);
     m_tree->setObjectName(QStringLiteral("fbv.tree"));
@@ -125,8 +154,10 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     m_tree->sortByColumn(FileListModel::NameColumn, Qt::AscendingOrder);
     connect(m_tree, &QTreeView::activated,
             this, &FileBrowserView::onEntryActivated);
-    connect(m_tree->selectionModel(), &QItemSelectionModel::selectionChanged,
-            this, [this] { emit selectionChanged(); });
+    connect(m_tree->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this] {
+        updateSelectedCount();
+        emit selectionChanged();
+    });
 
     QHeaderView *header = m_tree->header();
     header->setStretchLastSection(false);
@@ -139,13 +170,42 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     toolbarLayout->addWidget(m_upButton);
     toolbarLayout->addWidget(m_pathEdit, /*stretch*/ 3);
     toolbarLayout->addWidget(m_sortButton);
+    toolbarLayout->addWidget(m_viewButton);
     toolbarLayout->addWidget(m_filterEdit, /*stretch*/ 1);
-    toolbarLayout->addWidget(m_countLabel);
+
+    m_statusBar = new QStatusBar(this);
+    m_statusBar->setObjectName(QStringLiteral("fbv.statusBar"));
+    m_statusBar->setSizeGripEnabled(false);
+    m_selectedLabel = new QLabel(m_statusBar);
+    m_selectedLabel->setObjectName(QStringLiteral("fbv.selectedLabel"));
+    m_visibleLabel = new QLabel(m_statusBar);
+    m_visibleLabel->setObjectName(QStringLiteral("fbv.visibleLabel"));
+    m_totalLabel = new QLabel(m_statusBar);
+    m_totalLabel->setObjectName(QStringLiteral("fbv.totalLabel"));
+
+    // Floor each label's width at its 5-digit worst case so ordinary count
+    // changes don't shift the others; still free to grow past that if a
+    // count ever needs more digits.
+    const QFontMetrics statusMetrics(m_selectedLabel->font());
+    m_selectedLabel->setMinimumWidth(statusMetrics.horizontalAdvance(tr("Selected: %1").arg(99999)));
+    m_visibleLabel->setMinimumWidth(statusMetrics.horizontalAdvance(tr("Visible: %1").arg(99999)));
+    m_totalLabel->setMinimumWidth(statusMetrics.horizontalAdvance(tr("Total: %1").arg(99999)));
+
+    m_statusBar->addPermanentWidget(m_selectedLabel);
+    m_statusBar->addPermanentWidget(m_visibleLabel);
+    m_statusBar->addPermanentWidget(m_totalLabel);
+
+    auto *groupBox = new QGroupBox(tr("File Browser View"), this);
+    auto *groupLayout = new QVBoxLayout(groupBox);
+    groupLayout->setContentsMargins(4, 0, 4, 0);
+    groupLayout->addLayout(toolbarLayout);
+    groupLayout->addWidget(m_tree);
+    groupLayout->setSpacing(0);
+    groupLayout->addWidget(m_statusBar);
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 4, 4, 4);
-    layout->addLayout(toolbarLayout);
-    layout->addWidget(m_tree);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(groupBox);
 
     connect(m_session, &SmbSession::directoryListed,
             this, &FileBrowserView::onDirectoryListed);
@@ -161,20 +221,8 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     connect(m_tree->verticalScrollBar(), &QScrollBar::valueChanged,
             this, [this] { pumpStats(); });
 
-    updateCountLabel();
-}
-
-QList<SelectedFile> FileBrowserView::selectedFiles() const
-{
-    QList<SelectedFile> files;
-    const QModelIndexList rows = m_tree->selectionModel()->selectedRows();
-    for (const QModelIndex &proxyIndex : rows) {
-        const FileEntry &entry = m_model->entryAt(m_proxy->mapToSource(proxyIndex).row());
-        if (!entry.isDir) {
-            files.append({entryPath(entry.name), entry});
-        }
-    }
-    return files;
+    updateStatusBar();
+    updateSelectedCount();
 }
 
 void FileBrowserView::refresh()
@@ -182,6 +230,21 @@ void FileBrowserView::refresh()
     if (!m_currentPath.isEmpty()) {
         navigateTo(m_currentPath);
     }
+}
+
+void FileBrowserView::setIconMode(FileListModel::IconMode mode)
+{
+    m_model->setIconMode(mode);
+
+    // setChecked() only emits toggled(), never triggered() (which is what
+    // the actions' iconModeChangeRequested connections listen to), so this
+    // can't re-enter MainWindow's broadcast loop. Leaving toggled()
+    // unblocked matters: QActionGroup's own exclusivity enforcement listens
+    // to it to uncheck the sibling action.
+    QAction *checkedAction = mode == FileListModel::IconMode::Os
+        ? m_viewIconsOsAction
+        : m_viewIconsGenericAction;
+    checkedAction->setChecked(true);
 }
 
 void FileBrowserView::navigateTo(const QString &path)
@@ -230,7 +293,7 @@ void FileBrowserView::onDirectoryListed(const QString &path, const QList<FileEnt
     m_pathEdit->setText(path);
     m_upButton->setEnabled(path != QLatin1String("/"));
     m_model->setEntries(entries);
-    updateCountLabel();
+    updateStatusBar();
     resetStatQueue();
     if (!m_pendingReveal.isEmpty()) {
         revealByName(m_pendingReveal);
@@ -238,6 +301,7 @@ void FileBrowserView::onDirectoryListed(const QString &path, const QList<FileEnt
     }
     // The model reset cleared the selection without a selectionChanged signal
     // (QItemSelectionModel::reset is documented not to emit); tell listeners.
+    updateSelectedCount();
     emit selectionChanged();
 }
 
@@ -366,10 +430,13 @@ int FileBrowserView::nextStatRow()
     return -1;
 }
 
-void FileBrowserView::updateCountLabel()
+void FileBrowserView::updateStatusBar()
 {
-    const int total = m_model->rowCount();
-    m_countLabel->setText(m_filterEdit->text().isEmpty()
-                              ? QString::number(total)
-                              : tr("%1 / %2").arg(m_proxy->rowCount()).arg(total));
+    m_visibleLabel->setText(tr("Visible: %1").arg(m_proxy->rowCount()));
+    m_totalLabel->setText(tr("Total: %1").arg(m_model->rowCount()));
+}
+
+void FileBrowserView::updateSelectedCount()
+{
+    m_selectedLabel->setText(tr("Selected: %1").arg(m_tree->selectionModel()->selectedRows().size()));
 }

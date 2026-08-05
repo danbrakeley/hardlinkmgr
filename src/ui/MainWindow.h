@@ -6,6 +6,7 @@
 #include <functional>
 #include <optional>
 
+#include "models/FileListModel.h" // for the nested IconMode enum
 #include "smb/SmbSession.h"
 
 class QAction;
@@ -40,14 +41,14 @@ private:
     void restoreWindowGeometry();
     void saveSplitterState();
     void onConnectActionTriggered();
-    void onLinkActionTriggered();
     void onAboutActionTriggered();
-    void updateLinkAction();
     void addView();
     void onRevealRequested(const QString &primaryFolder, const QString &primaryName,
                            const QString &secondaryFolder, const QString &secondaryName);
     void onSessionStateChanged(SmbSession::State state);
     void onSessionError(const QString &message);
+    FileListModel::IconMode currentIconMode() const;
+    void onIconModeChangeRequested(FileListModel::IconMode mode);
     void advanceSpinner();
     QPixmap spinnerPixmap(int angleDegrees) const;
 
@@ -55,7 +56,6 @@ private:
     QToolBar *m_toolBar = nullptr;
     QLineEdit *m_urlEdit = nullptr;
     QAction *m_connectAction = nullptr;
-    QAction *m_linkAction = nullptr;
     QAction *m_aboutAction = nullptr;
     QLabel *m_centralLabel = nullptr;         // placeholder while not connected
     QSplitter *m_hSplitter = nullptr;         // central widget while connected

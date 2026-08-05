@@ -33,6 +33,8 @@ private slots:
     void setNlinkUpdatesRow();
     void setNlinkSameValueIsSilent();
     void setNlinkIgnoresBadRows();
+    void setIconModeUpdatesIconRole();
+    void setIconModeSameValueIsSilent();
 };
 
 void TestFileListModel::counts()
@@ -133,6 +135,37 @@ void TestFileListModel::setNlinkIgnoresBadRows()
     QSignalSpy spy(&model, &QAbstractItemModel::dataChanged);
     model.setNlink(-1, 2);
     model.setNlink(model.rowCount(), 2);
+    QCOMPARE(spy.count(), 0);
+}
+
+void TestFileListModel::setIconModeUpdatesIconRole()
+{
+    FileListModel model;
+    model.setEntries(sampleEntries());
+    QCOMPARE(model.iconMode(), FileListModel::IconMode::Os); // default
+    QSignalSpy spy(&model, &QAbstractItemModel::dataChanged);
+
+    model.setIconMode(FileListModel::IconMode::Generic);
+
+    QCOMPARE(model.iconMode(), FileListModel::IconMode::Generic);
+    QCOMPARE(spy.count(), 1);
+    const auto args = spy.takeFirst();
+    const QModelIndex topLeft = args.at(0).toModelIndex();
+    const QModelIndex bottomRight = args.at(1).toModelIndex();
+    QCOMPARE(topLeft.row(), 0);
+    QCOMPARE(topLeft.column(), int(FileListModel::IconColumn));
+    QCOMPARE(bottomRight.row(), model.rowCount() - 1);
+    QCOMPARE(bottomRight.column(), int(FileListModel::IconColumn));
+    const auto roles = args.at(2).value<QList<int>>();
+    QVERIFY(roles.contains(Qt::DecorationRole));
+}
+
+void TestFileListModel::setIconModeSameValueIsSilent()
+{
+    FileListModel model;
+    model.setEntries(sampleEntries());
+    QSignalSpy spy(&model, &QAbstractItemModel::dataChanged);
+    model.setIconMode(FileListModel::IconMode::Os); // already the default
     QCOMPARE(spy.count(), 0);
 }
 

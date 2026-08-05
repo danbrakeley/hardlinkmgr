@@ -129,11 +129,6 @@ if(HLM_DOCKER)
     LABELS "docker;widget"
     FIXTURES samba)
 
-  hlm_add_test(tst_hardlinkdialog
-    SOURCES widget/tst_hardlinkdialog.cpp common/SmbFixture.cpp
-    LABELS "docker;widget"
-    FIXTURES samba)
-
   hlm_add_test(tst_matchfinderpanel
     SOURCES widget/tst_matchfinderpanel.cpp common/SmbFixture.cpp common/TestSupport.cpp
     LABELS "docker;widget"

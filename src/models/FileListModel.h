@@ -30,6 +30,14 @@ public:
         IsDirRole,
     };
 
+    // How the icon column's Qt::DecorationRole is computed. Os asks the host
+    // OS for a per-extension icon (see IconUtil::osIcon); Generic keeps the
+    // original QStyle folder/file icons.
+    enum class IconMode {
+        Os,
+        Generic,
+    };
+
     explicit FileListModel(QObject *parent = nullptr);
 
     void setEntries(const QList<FileEntry> &entries);
@@ -37,6 +45,9 @@ public:
 
     // Milestone 3's lazy stat results land here, one row at a time.
     void setNlink(int row, int nlink);
+
+    void setIconMode(IconMode mode);
+    IconMode iconMode() const { return m_iconMode; }
 
     int rowCount(const QModelIndex &parent = {}) const override;
     int columnCount(const QModelIndex &parent = {}) const override;
@@ -47,4 +58,5 @@ private:
     QList<FileEntry> m_entries;
     QIcon m_dirIcon;
     QIcon m_fileIcon;
+    IconMode m_iconMode = IconMode::Os;
 };

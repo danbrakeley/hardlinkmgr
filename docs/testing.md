@@ -68,7 +68,6 @@ The automated suites use the same throttle to make fill-in states observable.
 
 Multiple views + polish.
 
-- [x] **Cross-view link run:** link a file from view A with a file from view B. After Close, *all* views refresh (both show updated link counts). (automated: tst_mainwindow + tst_hardlinkdialog cover the pieces; the refresh-after-Close wiring is spot-checked manually)
 - [x] **No console window:** launching the exe (double-click from Explorer) opens only the app window, no console. (manual)
 
 ## Milestone 6
