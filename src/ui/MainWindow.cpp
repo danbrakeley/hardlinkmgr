@@ -269,9 +269,26 @@ void MainWindow::addView()
     auto *view = new FileBrowserView(m_session, this);
     connect(view, &FileBrowserView::errorOccurred,
             this, &MainWindow::onSessionError);
+    connect(view, &FileBrowserView::iconModeChangeRequested,
+            this, &MainWindow::onIconModeChangeRequested);
+    view->setIconMode(currentIconMode());
     m_views.append(view);
     m_splitter->addWidget(view);
     view->navigateTo(QStringLiteral("/"));
+}
+
+FileListModel::IconMode MainWindow::currentIconMode() const
+{
+    return static_cast<FileListModel::IconMode>(
+        QSettings().value(QStringLiteral("view/iconMode"), int(FileListModel::IconMode::Os)).toInt());
+}
+
+void MainWindow::onIconModeChangeRequested(FileListModel::IconMode mode)
+{
+    QSettings().setValue(QStringLiteral("view/iconMode"), int(mode));
+    for (FileBrowserView *view : std::as_const(m_views)) {
+        view->setIconMode(mode);
+    }
 }
 
 void MainWindow::onAboutActionTriggered()

@@ -4,6 +4,8 @@
 #include <QLocale>
 #include <QStyle>
 
+#include "ui/IconUtil.h"
+
 FileListModel::FileListModel(QObject *parent)
     : QAbstractTableModel(parent)
 {
@@ -27,6 +29,20 @@ void FileListModel::setNlink(int row, int nlink)
     m_entries[row].nlink = nlink;
     const QModelIndex idx = index(row, LinksColumn);
     emit dataChanged(idx, idx, {Qt::DisplayRole, SortRole});
+}
+
+void FileListModel::setIconMode(IconMode mode)
+{
+    if (m_iconMode == mode) {
+        return;
+    }
+    m_iconMode = mode;
+    if (m_entries.isEmpty()) {
+        return;
+    }
+    const QModelIndex top = index(0, IconColumn);
+    const QModelIndex bottom = index(int(m_entries.size()) - 1, IconColumn);
+    emit dataChanged(top, bottom, {Qt::DecorationRole});
 }
 
 int FileListModel::rowCount(const QModelIndex &parent) const
@@ -72,6 +88,9 @@ QVariant FileListModel::data(const QModelIndex &index, int role) const
 
     case Qt::DecorationRole:
         if (index.column() == IconColumn) {
+            if (m_iconMode == IconMode::Os) {
+                return osIcon(entry.name, entry.isDir);
+            }
             return entry.isDir ? m_dirIcon : m_fileIcon;
         }
         break;

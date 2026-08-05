@@ -1,5 +1,6 @@
 #include <QtTest>
 
+#include <QAction>
 #include <QLabel>
 #include <QLineEdit>
 #include <QRegularExpression>
@@ -28,6 +29,7 @@ private slots:
     void navigationByActivationAndPathBox();
     void badPathReverts();
     void upButton();
+    void viewIconModeMenu();
     void filterAndSelectionUpdateStatusBar();
     void statPumpFillsAndDrains();
     void navigationCancelsFill();
@@ -148,6 +150,34 @@ void TestFileBrowserView::upButton()
 
     upButton->click();
     QTRY_COMPARE(view.currentPath(), dir); // immediate parent
+}
+
+void TestFileBrowserView::viewIconModeMenu()
+{
+    SmbSession session;
+    QVERIFY(m_fx.connectForTest(session));
+    FileBrowserView view(&session);
+
+    auto *osAction = view.findChild<QAction *>("fbv.viewIconsOs");
+    auto *genericAction = view.findChild<QAction *>("fbv.viewIconsGeneric");
+    QVERIFY(osAction);
+    QVERIFY(genericAction);
+    QVERIFY(osAction->isCheckable());
+    QVERIFY(genericAction->isCheckable());
+    QVERIFY(osAction->actionGroup()); // mutually exclusive with genericAction
+    QCOMPARE(osAction->actionGroup(), genericAction->actionGroup());
+
+    // Defaults to OS icons.
+    QVERIFY(osAction->isChecked());
+    QVERIFY(!genericAction->isChecked());
+
+    view.setIconMode(FileListModel::IconMode::Generic);
+    QVERIFY(!osAction->isChecked());
+    QVERIFY(genericAction->isChecked());
+
+    view.setIconMode(FileListModel::IconMode::Os);
+    QVERIFY(osAction->isChecked());
+    QVERIFY(!genericAction->isChecked());
 }
 
 void TestFileBrowserView::filterAndSelectionUpdateStatusBar()

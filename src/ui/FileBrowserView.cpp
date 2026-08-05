@@ -103,6 +103,34 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
 
     m_sortButton->setMenu(sortMenu);
 
+    m_viewButton = new QToolButton(this);
+    m_viewButton->setIcon(coloredIcon(QStringLiteral(":/icons/content_view.svg"),
+                                      palette().color(QPalette::ButtonText),
+                                      m_viewButton->iconSize(), devicePixelRatioF()));
+    m_viewButton->setText(tr("View"));
+    m_viewButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_viewButton->setToolTip(tr("Icon options"));
+    m_viewButton->setAutoRaise(true);
+    m_viewButton->setPopupMode(QToolButton::InstantPopup);
+
+    auto *viewMenu = new QMenu(m_viewButton);
+    auto *iconModeGroup = new QActionGroup(viewMenu);
+    m_viewIconsOsAction = viewMenu->addAction(tr("Use OS file-type icons"));
+    m_viewIconsOsAction->setObjectName(QStringLiteral("fbv.viewIconsOs"));
+    m_viewIconsOsAction->setCheckable(true);
+    m_viewIconsOsAction->setChecked(true); // matches FileListModel's default
+    iconModeGroup->addAction(m_viewIconsOsAction);
+    m_viewIconsGenericAction = viewMenu->addAction(tr("Use generic icon"));
+    m_viewIconsGenericAction->setObjectName(QStringLiteral("fbv.viewIconsGeneric"));
+    m_viewIconsGenericAction->setCheckable(true);
+    iconModeGroup->addAction(m_viewIconsGenericAction);
+    connect(m_viewIconsOsAction, &QAction::triggered, this,
+            [this] { emit iconModeChangeRequested(FileListModel::IconMode::Os); });
+    connect(m_viewIconsGenericAction, &QAction::triggered, this,
+            [this] { emit iconModeChangeRequested(FileListModel::IconMode::Generic); });
+
+    m_viewButton->setMenu(viewMenu);
+
     m_filterEdit = new QLineEdit(this);
     m_filterEdit->setObjectName(QStringLiteral("fbv.filterEdit"));
     m_filterEdit->setPlaceholderText(tr("Filter"));
@@ -142,6 +170,7 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     toolbarLayout->addWidget(m_upButton);
     toolbarLayout->addWidget(m_pathEdit, /*stretch*/ 3);
     toolbarLayout->addWidget(m_sortButton);
+    toolbarLayout->addWidget(m_viewButton);
     toolbarLayout->addWidget(m_filterEdit, /*stretch*/ 1);
 
     m_statusBar = new QStatusBar(this);
@@ -201,6 +230,21 @@ void FileBrowserView::refresh()
     if (!m_currentPath.isEmpty()) {
         navigateTo(m_currentPath);
     }
+}
+
+void FileBrowserView::setIconMode(FileListModel::IconMode mode)
+{
+    m_model->setIconMode(mode);
+
+    // setChecked() only emits toggled(), never triggered() (which is what
+    // the actions' iconModeChangeRequested connections listen to), so this
+    // can't re-enter MainWindow's broadcast loop. Leaving toggled()
+    // unblocked matters: QActionGroup's own exclusivity enforcement listens
+    // to it to uncheck the sibling action.
+    QAction *checkedAction = mode == FileListModel::IconMode::Os
+        ? m_viewIconsOsAction
+        : m_viewIconsGenericAction;
+    checkedAction->setChecked(true);
 }
 
 void FileBrowserView::navigateTo(const QString &path)

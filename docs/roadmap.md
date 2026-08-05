@@ -11,14 +11,12 @@ Pri: 1 (highest) to 5 (lowest)
 
 | Pri | Name                                       | Notes                                                |
 | --- | ------------------------------------------ | ---------------------------------------------------- |
-| 3   | More appropriate file icons                | How much overhead does it add to use the OS icons?   |
+| 2   | Resizable columns in search results        |                                                      |
 | 3   | Add new mode for finding links             | In a tab with the Match Finder?                      |
 | 3   | Add new mode for creating new links        | Maybe in a tab with the Match Finder?                |
 | 4   | Starting search result paths               | default to following view?                           |
-| 5   | Resizable columns in search results        |                                                      |
 | 5   | In-app display/browser for log/history     | Should update live as things happen                  |
 | 5   | More general file management               | ie rename/delete... need specific use case first     |
-| 5   | In-app icons                               | Icons have been improved, but do another pass        |
 | √   | ~~Improve finding matches~~                | **Match Finder shipped as Milestone 7 (2026-07-22)** |
 | √   | ~~Testing~~                                | **Unit & Integration tests added 2026-07-28**        |
 | √   | ~~Build/release workflows~~                | **Github actions added 2026-07-28**                  |
@@ -28,6 +26,7 @@ Pri: 1 (highest) to 5 (lowest)
 | √   | ~~Detect when there's a newer version~~    | **About Dialog can do a manual check 2026-07-30**    |
 | √   | ~~Move counts from toolbar to status bar~~ | **Shipped 2026-08-01**                               |
 | √   | ~~Link button is confusing~~               | **Removed 2026-08-04; use Match Finder to link**     |
+| √   | ~~More appropriate file icons~~            | **View dropdown (OS/generic) shipped 2026-08-05**    |
 
 ## In-app display/browser for log/history
 

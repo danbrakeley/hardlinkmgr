@@ -4,8 +4,10 @@
 #include <QSet>
 #include <QWidget>
 
+#include "models/FileListModel.h" // for the nested IconMode enum (setIconMode/signal)
 #include "smb/SmbTypes.h"
 
+class QAction;
 class QItemSelectionModel;
 class QLabel;
 class QLineEdit;
@@ -15,7 +17,6 @@ class QToolButton;
 class QTreeView;
 
 class FileFilterProxyModel;
-class FileListModel;
 class SmbSession;
 
 // One filesystem view: path box, case-insensitive filter box, and the file
@@ -37,9 +38,19 @@ public:
 
     QString currentPath() const { return m_currentPath; }
 
+    // Applies mode to this view's model and updates the View menu's checked
+    // action. MainWindow owns broadcasting a mode change to every view (see
+    // iconModeChangeRequested) so both views' icons and checkmarks agree.
+    void setIconMode(FileListModel::IconMode mode);
+
 signals:
     void errorOccurred(const QString &message); // surfaced in the main status bar
     void selectionChanged(); // fires on user selection and on listing changes
+
+    // The user picked a View menu option. This view does NOT apply the mode
+    // to itself on this signal - MainWindow re-broadcasts to every view via
+    // setIconMode() so both panes stay in sync.
+    void iconModeChangeRequested(FileListModel::IconMode mode);
 
 private:
     void onPathEdited();
@@ -64,6 +75,9 @@ private:
     QToolButton *m_upButton = nullptr;
     QLineEdit *m_pathEdit = nullptr;
     QToolButton *m_sortButton = nullptr;
+    QToolButton *m_viewButton = nullptr;
+    QAction *m_viewIconsOsAction = nullptr;
+    QAction *m_viewIconsGenericAction = nullptr;
     QLineEdit *m_filterEdit = nullptr;
     QStatusBar *m_statusBar = nullptr;
     QLabel *m_selectedLabel = nullptr;

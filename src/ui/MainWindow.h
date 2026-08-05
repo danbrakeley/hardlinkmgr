@@ -6,6 +6,7 @@
 #include <functional>
 #include <optional>
 
+#include "models/FileListModel.h" // for the nested IconMode enum
 #include "smb/SmbSession.h"
 
 class QAction;
@@ -46,6 +47,8 @@ private:
                            const QString &secondaryFolder, const QString &secondaryName);
     void onSessionStateChanged(SmbSession::State state);
     void onSessionError(const QString &message);
+    FileListModel::IconMode currentIconMode() const;
+    void onIconModeChangeRequested(FileListModel::IconMode mode);
     void advanceSpinner();
     QPixmap spinnerPixmap(int angleDegrees) const;
 

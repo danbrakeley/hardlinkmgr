@@ -1,6 +1,6 @@
 # App icon
 
-The app icon [`app256.png`](./app256.png) is © Dan Brakeley 2026, all rights reserved, and incorporates the following works:
+The app icon [`app256.png`](./app256.png) is © Copyright 2026 by Dan Brakeley, all rights reserved, and incorporates the following works:
 
 - [Magnifying Glass 9](https://www.svgrepo.com/svg/479646/magnifying-glass-9)
   - License: [Public Domain](https://www.svgrepo.com/page/licensing/#PD)
