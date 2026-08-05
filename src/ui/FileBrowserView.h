@@ -18,13 +18,6 @@ class FileFilterProxyModel;
 class FileListModel;
 class SmbSession;
 
-// A file selected in a view, with the metadata the Hard Link dialog shows.
-struct SelectedFile
-{
-    QString path; // share-absolute
-    FileEntry entry;
-};
-
 // One filesystem view: path box, case-insensitive filter box, and the file
 // table, with a status bar below showing Selected/Visible/Total counts. The
 // full listing stays in memory; the proxy decides what is shown.
@@ -43,9 +36,6 @@ public:
     void navigateToAndReveal(const QString &folderPath, const QString &fileName);
 
     QString currentPath() const { return m_currentPath; }
-
-    // The files (never folders) currently selected in this view.
-    QList<SelectedFile> selectedFiles() const;
 
 signals:
     void errorOccurred(const QString &message); // surfaced in the main status bar

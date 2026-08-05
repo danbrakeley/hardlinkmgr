@@ -81,8 +81,6 @@ qt_add_library(hardlinkmgr_core STATIC
   src/ui/CheckBoxHeader.h
   src/ui/FileBrowserView.cpp
   src/ui/FileBrowserView.h
-  src/ui/HardLinkDialog.cpp
-  src/ui/HardLinkDialog.h
   src/ui/IconUtil.cpp
   src/ui/IconUtil.h
   src/ui/MainWindow.cpp

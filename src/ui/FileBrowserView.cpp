@@ -2,8 +2,10 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QFontMetrics>
 #include <QItemSelectionModel>
 #include <QLabel>
 #include <QLineEdit>
@@ -151,15 +153,30 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     m_visibleLabel->setObjectName(QStringLiteral("fbv.visibleLabel"));
     m_totalLabel = new QLabel(m_statusBar);
     m_totalLabel->setObjectName(QStringLiteral("fbv.totalLabel"));
+
+    // Floor each label's width at its 5-digit worst case so ordinary count
+    // changes don't shift the others; still free to grow past that if a
+    // count ever needs more digits.
+    const QFontMetrics statusMetrics(m_selectedLabel->font());
+    m_selectedLabel->setMinimumWidth(statusMetrics.horizontalAdvance(tr("Selected: %1").arg(99999)));
+    m_visibleLabel->setMinimumWidth(statusMetrics.horizontalAdvance(tr("Visible: %1").arg(99999)));
+    m_totalLabel->setMinimumWidth(statusMetrics.horizontalAdvance(tr("Total: %1").arg(99999)));
+
     m_statusBar->addPermanentWidget(m_selectedLabel);
     m_statusBar->addPermanentWidget(m_visibleLabel);
     m_statusBar->addPermanentWidget(m_totalLabel);
 
+    auto *groupBox = new QGroupBox(tr("File Browser View"), this);
+    auto *groupLayout = new QVBoxLayout(groupBox);
+    groupLayout->setContentsMargins(4, 0, 4, 0);
+    groupLayout->addLayout(toolbarLayout);
+    groupLayout->addWidget(m_tree);
+    groupLayout->setSpacing(0);
+    groupLayout->addWidget(m_statusBar);
+
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 4, 4, 4);
-    layout->addLayout(toolbarLayout);
-    layout->addWidget(m_tree);
-    layout->addWidget(m_statusBar);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(groupBox);
 
     connect(m_session, &SmbSession::directoryListed,
             this, &FileBrowserView::onDirectoryListed);
@@ -177,19 +194,6 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
 
     updateStatusBar();
     updateSelectedCount();
-}
-
-QList<SelectedFile> FileBrowserView::selectedFiles() const
-{
-    QList<SelectedFile> files;
-    const QModelIndexList rows = m_tree->selectionModel()->selectedRows();
-    for (const QModelIndex &proxyIndex : rows) {
-        const FileEntry &entry = m_model->entryAt(m_proxy->mapToSource(proxyIndex).row());
-        if (!entry.isDir) {
-            files.append({entryPath(entry.name), entry});
-        }
-    }
-    return files;
 }
 
 void FileBrowserView::refresh()

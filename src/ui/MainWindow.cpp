@@ -2,7 +2,6 @@
 
 #include "ui/AboutDialog.h"
 #include "ui/FileBrowserView.h"
-#include "ui/HardLinkDialog.h"
 #include "ui/IconUtil.h"
 #include "ui/MatchFinderPanel.h"
 
@@ -14,7 +13,6 @@
 #include <QLineEdit>
 #include <QPainter>
 #include <QScreen>
-#include <QSet>
 #include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
@@ -57,15 +55,6 @@ MainWindow::MainWindow(QWidget *parent)
             m_connectAction->trigger();
         }
     });
-
-    m_toolBar->addSeparator();
-
-    m_linkAction = m_toolBar->addAction(tr("Link"));
-    m_linkAction->setObjectName(QStringLiteral("mw.linkAction"));
-    m_linkAction->setEnabled(false); // needs >=2 files selected across the views
-    m_linkAction->setToolTip(tr("Replace selected files with hard links (select at least two files)"));
-    connect(m_linkAction, &QAction::triggered,
-            this, &MainWindow::onLinkActionTriggered);
 
     m_toolBar->addSeparator();
 
@@ -237,8 +226,8 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         m_splitter = new QSplitter(Qt::Vertical, m_hSplitter);
         m_splitter->setChildrenCollapsible(false);
         m_matchPanel = new MatchFinderPanel(m_session, m_hSplitter);
-        m_hSplitter->addWidget(m_splitter);
         m_hSplitter->addWidget(m_matchPanel);
+        m_hSplitter->addWidget(m_splitter);
         m_hSplitter->setStretchFactor(0, 2); // views get ~2/3 by default
         m_hSplitter->setStretchFactor(1, 1);
         connect(m_matchPanel, &MatchFinderPanel::revealRequested,
@@ -270,7 +259,6 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         statusBar()->showMessage(tr("Connected to %1.").arg(m_shareDisplayName));
         break;
     }
-    updateLinkAction();
 }
 
 void MainWindow::addView()
@@ -281,55 +269,9 @@ void MainWindow::addView()
     auto *view = new FileBrowserView(m_session, this);
     connect(view, &FileBrowserView::errorOccurred,
             this, &MainWindow::onSessionError);
-    connect(view, &FileBrowserView::selectionChanged,
-            this, &MainWindow::updateLinkAction);
     m_views.append(view);
     m_splitter->addWidget(view);
     view->navigateTo(QStringLiteral("/"));
-}
-
-// "Link" needs at least two distinct files selected across all views.
-void MainWindow::updateLinkAction()
-{
-    int count = 0;
-    if (m_session->state() == SmbSession::State::Connected) {
-        QSet<QString> paths;
-        for (const FileBrowserView *view : std::as_const(m_views)) {
-            for (const SelectedFile &file : view->selectedFiles()) {
-                paths.insert(file.path);
-            }
-        }
-        count = paths.size();
-    }
-    m_linkAction->setEnabled(count >= 2);
-}
-
-void MainWindow::onLinkActionTriggered()
-{
-    // Gather across all views, dropping duplicate paths (the same file can be
-    // selected in more than one view).
-    QList<SelectedFile> files;
-    QSet<QString> seen;
-    for (const FileBrowserView *view : std::as_const(m_views)) {
-        for (const SelectedFile &file : view->selectedFiles()) {
-            if (!seen.contains(file.path)) {
-                seen.insert(file.path);
-                files.append(file);
-            }
-        }
-    }
-    if (files.size() < 2) {
-        return;
-    }
-
-    HardLinkDialog dialog(m_session, files, this);
-    if (dialog.exec() == QDialog::Accepted) {
-        // A run happened (even a partly failed one changes the share); every
-        // view may be showing affected files or link counts.
-        for (FileBrowserView *view : std::as_const(m_views)) {
-            view->refresh();
-        }
-    }
 }
 
 void MainWindow::onAboutActionTriggered()

@@ -4,7 +4,6 @@
 #include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
-#include <QTreeView>
 
 #include "ui/FileBrowserView.h"
 #include "ui/MainWindow.h"
@@ -16,8 +15,8 @@
 // The main-window connect flow and toolbar logic, driven through the real
 // widgets with a stubbed password prompt (the modal QInputDialog never runs
 // under test). Covers testing.md M1 "Connect"/"Disconnect"/"Cancelled
-// password prompt"/"Bad URL", M4 "Link enablement", M5 "Cross-view
-// selection"/"Remembered URL", and the M7 panel layout.
+// password prompt"/"Bad URL", M5 "Cross-view selection"/"Remembered URL",
+// and the M7 panel layout.
 class TestMainWindow : public QObject
 {
     Q_OBJECT
@@ -30,14 +29,11 @@ private slots:
     void cancelledPromptStaysDisconnected();
     void connectFlowBuildsTwoViewsAndPanel();
     void disconnectRestoresPlaceholder();
-    void linkEnablement();
     void rememberedUrl();
 
 private:
     // Installs a prompt stub and drives the toolbar through a full connect.
     void connectWindow(MainWindow &window);
-    static void selectByName(FileBrowserView *view, const QString &name,
-                             bool addToSelection);
 
     SmbFixture m_fx;
 };
@@ -63,25 +59,6 @@ void TestMainWindow::connectWindow(MainWindow &window)
     urlEdit->setText(m_fx.url());
     connectAction->trigger();
     QTRY_COMPARE_WITH_TIMEOUT(connectAction->text(), "Disconnect", 15000);
-}
-
-void TestMainWindow::selectByName(FileBrowserView *view, const QString &name,
-                                  bool addToSelection)
-{
-    auto *tree = view->findChild<QTreeView *>("fbv.tree");
-    QVERIFY(tree);
-    QAbstractItemModel *model = tree->model();
-    for (int row = 0; row < model->rowCount(); ++row) {
-        const QModelIndex idx = model->index(row, 1); // NameColumn
-        if (idx.data().toString() == name) {
-            tree->selectionModel()->select(
-                idx, QItemSelectionModel::Rows
-                         | (addToSelection ? QItemSelectionModel::Select
-                                           : QItemSelectionModel::ClearAndSelect));
-            return;
-        }
-    }
-    QFAIL(qPrintable("no row named " + name));
 }
 
 void TestMainWindow::badUrlShowsErrorWithoutPrompt()
@@ -163,46 +140,6 @@ void TestMainWindow::disconnectRestoresPlaceholder()
     QVERIFY(!qobject_cast<QSplitter *>(window.centralWidget()));
     // The old splitter (and the views under it) go away via deleteLater.
     QTRY_COMPARE(window.findChildren<FileBrowserView *>().size(), 0);
-}
-
-void TestMainWindow::linkEnablement()
-{
-    const QString dir = m_fx.makeCaseDir("linkenable");
-    m_fx.seedFile(dir, "a.bin", 100);
-    m_fx.seedFile(dir, "b.bin", 100);
-    m_fx.makeDir(dir + "/folder");
-
-    MainWindow window;
-    connectWindow(window);
-    auto *linkAction = window.findChild<QAction *>("mw.linkAction");
-    const auto views = window.findChildren<FileBrowserView *>();
-    QCOMPARE(views.size(), 2);
-
-    views[0]->navigateTo(dir);
-    views[1]->navigateTo(dir);
-    QTRY_COMPARE(views[0]->currentPath(), dir);
-    QTRY_COMPARE(views[1]->currentPath(), dir);
-    QVERIFY(!linkAction->isEnabled()); // nothing selected
-
-    selectByName(views[0], "a.bin", false);
-    QVERIFY(!linkAction->isEnabled()); // one file
-
-    // A folder does not count toward the two files.
-    selectByName(views[0], "folder", true);
-    QVERIFY(!linkAction->isEnabled());
-
-    // The same file selected in the other view still counts once.
-    selectByName(views[1], "a.bin", false);
-    QVERIFY(!linkAction->isEnabled());
-
-    // A second distinct file enables Link (cross-view selection).
-    selectByName(views[1], "b.bin", false);
-    QVERIFY(linkAction->isEnabled());
-
-    // Navigation clears the selection and disables Link again.
-    views[1]->navigateTo("/");
-    QTRY_COMPARE(views[1]->currentPath(), "/");
-    QVERIFY(!linkAction->isEnabled());
 }
 
 void TestMainWindow::rememberedUrl()

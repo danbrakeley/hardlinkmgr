@@ -16,7 +16,6 @@ Pri: 1 (highest) to 5 (lowest)
 | 3   | Add new mode for creating new links        | Maybe in a tab with the Match Finder?                |
 | 4   | Starting search result paths               | default to following view?                           |
 | 5   | Resizable columns in search results        |                                                      |
-| 5   | Link button is confusing                   | Move it? Rename it? Remove it?                       |
 | 5   | In-app display/browser for log/history     | Should update live as things happen                  |
 | 5   | More general file management               | ie rename/delete... need specific use case first     |
 | 5   | In-app icons                               | Icons have been improved, but do another pass        |
@@ -28,6 +27,7 @@ Pri: 1 (highest) to 5 (lowest)
 | √   | ~~About dialog~~                           | **Shipped 2026-07-30**                               |
 | √   | ~~Detect when there's a newer version~~    | **About Dialog can do a manual check 2026-07-30**    |
 | √   | ~~Move counts from toolbar to status bar~~ | **Shipped 2026-08-01**                               |
+| √   | ~~Link button is confusing~~               | **Removed 2026-08-04; use Match Finder to link**     |
 
 ## In-app display/browser for log/history
 
