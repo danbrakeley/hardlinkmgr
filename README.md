@@ -30,9 +30,9 @@ There are command line solutions that will do this (e.g. [jdupes](https://codebe
 
 ## Screenshot
 
-Here's what v0.2.2 looks like in action, with the list of matches on the right, and on the left you have views into the SMB share's file system with specifics about each file in the match.
+Here's what v0.3.0 looks like in action, with the interface for searching and viewing results on the left, and detailed directory listings on the right.
 
-![a screenshot of the app running on Windows](./docs/screenshot-v0.2.2.png)
+![a screenshot of the app running on Windows](./docs/screenshot-v0.3.0.png)
 
 ## Documents
 
