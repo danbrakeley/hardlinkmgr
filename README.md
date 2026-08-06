@@ -18,9 +18,9 @@ It does this as QUICKLY as possible, and as such it shows potential matches WITH
 
 I do want to add byte-by-byte comparisons at some point, but for my initial use case, I didn't need it.
 
-Here's what v0.3.0 looks like in action, with the interface for searching and viewing results on the left, and detailed directory listings on the right:
+Here's what v0.3.1 looks like in action, with the interface for searching and viewing results on the left, and detailed directory listings on the right:
 
-![a screenshot of the app running on Windows](./docs/screenshot-v0.3.0.png)
+![a screenshot of the app running on Windows](./docs/screenshot-v0.3.1.png)
 
 ## Original Problem
 
