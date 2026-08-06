@@ -204,7 +204,7 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     groupLayout->addWidget(m_statusBar);
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setContentsMargins(4, 4, 4, 4);
     layout->addWidget(groupBox);
 
     connect(m_session, &SmbSession::directoryListed,

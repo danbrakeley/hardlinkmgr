@@ -1,44 +1,49 @@
 # Hard Link Manager <!-- omit in toc -->
 
+- [Overview](#overview)
 - [Original Problem](#original-problem)
 - [Constraints](#constraints)
-- [Screenshot](#screenshot)
-- [Documents](#documents)
+- [Development Notes](#development-notes)
 - [Build](#build)
   - [Windows](#windows)
   - [Linux](#linux)
 - [Tests](#tests)
-- [Cutting a release](#cutting-a-release)
+- [Releasing](#releasing)
+
+## Overview
+
+Hard Link Manager allows you to connect to a remote SMB server, view files/folders details including inode numbers and hard link counts, and then find possible duplicate files and replace one with a link to the other.
+
+It does this as QUICKLY as possible, and as such it shows potential matches WITHOUT doing a comparison of the file contents. It relies on the human operator to know what is actually a match. AS SUCH THIS APP IS VERY DANGEROUS.
+
+I do want to add byte-by-byte comparisons at some point, but for my initial use case, I didn't need it.
+
+Here's what v0.3.1 looks like in action, with the interface for searching and viewing results on the left, and detailed directory listings on the right:
+
+![a screenshot of the app running on Windows](./docs/screenshot-v0.3.1.png)
 
 ## Original Problem
 
-I've got an SMB share with large files that never change, but there are some copies of the same file in different folders with different names, and because the files are large, this wastes a lot of disk space. So I wanted to find these duplicate files, and use [hard links](https://en.wikipedia.org/wiki/Hard_link) to force them both to use the same bytes on disk.
+I've got an SMB share with large files that never change, but there are some copies of the same file in different folders with different names, and because the files are large, this wastes a lot of disk space. So I wanted to find these duplicate files, and use [hard links](https://en.wikipedia.org/wiki/Hard_link) to force them both to share the same bytes on disk.
 
 There are command line solutions that will do this (e.g. [jdupes](https://codeberg.org/jbruchon/jdupes)), but I wanted a different experience, including:
 
-1. to connect as an SMB client, and not require SSH access, especially not if it also meant running as root.
-2. to not bypass existing NAS security/safety features, like Synology's Recycle Bin.
-3. to avoid reading file contents for large files, and instead rely on a human who can quickly tell from the file names which files are the same.
+1. do all work remotely via an existing SMB user, with that user's credentials and permissions.
+2. avoid reading every byte of every file I wanted to compare, and instead quickly locate potential matches, then choose the actual matches by hand.
+3. browse files/folders in a GUI, seeing inode and hard link info.
 
 ## Constraints
 
 - GUI application
-- App starts instantly (lightweight)
+- App starts quickly, stays responsive during work (lightweight, batches slow work in threads)
 - Low resource usage
-- Cross platform (Windows & Linux required, macOS is nice-to-have)
-- Looks and feels like a native app on each platform, using native widget hotkeys/UX.
+- Cross platform (Windows & Linux required; macOS is nice-to-have)
+- Looks and feels like a native app on each platform.
 
-## Screenshot
+## Development Notes
 
-Here's what v0.2.2 looks like in action, with the list of matches on the right, and on the left you have views into the SMB share's file system with specifics about each file in the match.
-
-![a screenshot of the app running on Windows](./docs/screenshot-v0.2.2.png)
-
-## Documents
-
-- [ADRs](./docs/decisions/) - Architectural Decision Records
 - [roadmap.md](./docs/roadmap.md) - Where this app is heading
-- [testing.md](./docs/testing.md) - Checklist of things not covered by automated tests
+- [ADRs](./docs/decisions/) - Architectural Decision Records
 
 ## Build
 
@@ -66,13 +71,17 @@ Targets:
 
 ### Windows
 
-Requires you to manually install Qt with the binaries compiled with MSVC. When I last did this, there was no preset I could use, I had to customize the install to get the MSVC binaries.
+- I developed this using [MSBuild 18.8 (Visual Studio 2026)](https://visualstudio.microsoft.com/)
+- Qt's MSVC binaries can be installed by selecting "Custom Installation" in the [online installer](https://doc.qt.io/qt-6/qt-online-installation.html).
+- To use git and bash scripts, I use [Git for Windows](https://git-scm.com/install/windows)
+- To use the Makefile, I installed `make` via [scoop](https://scoop.sh/).
+- To run the integration tests, you'll need [Docker](https://docs.docker.com/desktop/setup/install/windows-install/) installed and running.
 
-Builds are found in `build\windows\bin\{Release|Debug}\hardlinkmgr.exe`. Required Qt .dlls are in the same folder.
+Builds end up in `build\windows\bin\{Release|Debug}\hardlinkmgr.exe`. Required Qt .dlls are copied into the same folder.
 
 ### Linux
 
-Installing dependencies depends on your linux flavor, but for Ubuntu 26.04, I did this:
+For Ubuntu 26.04, here's the `apt install` line I used:
 
 ```bash
 sudo apt install git curl build-essential cmake ninja-build qt6-base-dev qt6-svg-dev qt6-wayland libgl1-mesa-dev
@@ -102,28 +111,16 @@ ctest --preset windows-all     # everything, incl. integration/widget suites
 
 The full run needs **Docker** with Compose v2: ctest builds and starts a Samba container (port 10445, share on a named volume), runs the SMB-backed suites against it, and tears it down. Without Docker on PATH those suites aren't registered and the unit tier still runs. See [`docs/testing.md`](./docs/testing.md) and [ADR 4](./docs/decisions/0004-automated-test-architecture.md).
 
-## Cutting a release
+## Releasing
 
-`.github/workflows/release.yml` builds Windows + Linux artifacts and, when triggered by a tag, attaches them to a GitHub Release. There's no separate version file — the version lives in one place, and the release is just a tag that matches it:
+`.github/workflows/release.yml` builds Windows and Linux artifacts and attaches them to a Release. This job requires the `VERSION` in `CMakeLists.txt` to match the pushed tag.
 
-1. Bump `VERSION` in the top-level `CMakeLists.txt`'s `project()` call (e.g. `VERSION 0.1.0` → `0.2.0`). This is the only place the version is defined — it flows into the Linux `.deb`'s filename via CPack (`CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT"`); the Windows zip's name (`hardlinkmgr-windows-x64.zip`) is unversioned by design, so nothing there needs touching.
+So the specific steps are:
 
-2. Commit that change and push it to `main` (or merge it in) — the tag in the next step must point at a commit that already has the bumped version, or the built `.deb` will carry the old version number.
+1. Bump `VERSION` in the top-level `CMakeLists.txt`'s `project()` call. `VERSION` is used in the Linux `.deb`'s filename via CPack (`CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT"`). Note that the Windows zip's name is unversioned.
 
-3. Tag the commit `vMAJOR.MINOR.PATCH`, matching the `CMakeLists.txt` value exactly (the workflow only triggers on a `v*` tag push; its `check-version` job compares the tag against `CMakeLists.txt`'s `VERSION` and fails fast — before the windows/linux jobs spend runner time — if they don't match):
+2. Create a Release with a tag `vMAJOR.MINOR.PATCH`, matching the `CMakeLists.txt` value exactly. The workflow verifies this in the `check-version` job.
 
-   ```bash
-   git tag v0.2.0
-   git push origin v0.2.0
-   ```
+3. The tag creation triggers the release workflow, and when the workflow is complete, it attaches the build artifacts to the GitHub Release automatically.
 
-4. Pushing the tag triggers the `windows` and `linux` jobs, then (only for a `v*` tag, not `workflow_dispatch`) the `release` job, which downloads both artifacts and publishes a GitHub Release with the zip and `.deb` attached. Watch it under the repo's **Actions** tab.
-
-5. If something's wrong with the build, delete the tag (locally and on the remote), fix it, and re-tag rather than reusing the same tag name:
-
-   ```bash
-   git tag -d v0.2.0
-   git push origin :refs/tags/v0.2.0
-   ```
-
-To test the build+package steps without creating a release (e.g. to check CI still passes before tagging), run the workflow manually from the Actions tab (`workflow_dispatch`) — same jobs, but the `release` job is skipped since there's no `v*` tag.
+Note that you can manually run this workflow on any commit without a `v*` tag, and it will safely skip trying to upload the artifacts to a release.
