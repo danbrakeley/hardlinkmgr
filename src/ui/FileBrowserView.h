@@ -43,6 +43,15 @@ public:
     // iconModeChangeRequested) so both views' icons and checkmarks agree.
     void setIconMode(FileListModel::IconMode mode);
 
+    // Stops (or resumes) sending new lazy stat requests. MainWindow pauses
+    // every view while a Match/Link Finder search is running, since they all
+    // share one SmbSession and a folder's worth of stat calls otherwise
+    // starves the search's own listings of round trips on that connection.
+    // Requests already in flight are unaffected (SmbSession has no
+    // per-operation cancel); this only stops refilling the pump.
+    void setStatsPaused(bool paused);
+    bool statsPaused() const { return m_statsPaused; }
+
 signals:
     void errorOccurred(const QString &message); // surfaced in the main status bar
     void selectionChanged(); // fires on user selection and on listing changes
@@ -94,4 +103,5 @@ private:
     int m_statCursor = 0;            // next sequential candidate in m_statOrder
     QSet<int> m_statRequested;       // source rows already sent (or done)
     QHash<QString, int> m_statInFlight; // full path -> source row
+    bool m_statsPaused = false;
 };

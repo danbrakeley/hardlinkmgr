@@ -55,8 +55,11 @@ qt_standard_project_setup()
 # All app code lives in a static library so the test executables under tests/
 # link the exact same objects; the app target is just main.cpp.
 qt_add_library(hardlinkmgr_core STATIC
+  src/core/LinkGrouping.h
   src/core/LinkRunner.cpp
   src/core/LinkRunner.h
+  src/core/LinkSearcher.cpp
+  src/core/LinkSearcher.h
   src/core/LogFormat.h
   src/core/Logger.cpp
   src/core/Logger.h
@@ -70,6 +73,8 @@ qt_add_library(hardlinkmgr_core STATIC
   src/models/FileFilterProxyModel.h
   src/models/FileListModel.cpp
   src/models/FileListModel.h
+  src/models/LinkResultsModel.cpp
+  src/models/LinkResultsModel.h
   src/models/MatchResultsModel.cpp
   src/models/MatchResultsModel.h
   src/smb/SmbSession.cpp
@@ -83,10 +88,13 @@ qt_add_library(hardlinkmgr_core STATIC
   src/ui/FileBrowserView.h
   src/ui/IconUtil.cpp
   src/ui/IconUtil.h
+  src/ui/LinkFinderPanel.cpp
+  src/ui/LinkFinderPanel.h
   src/ui/MainWindow.cpp
   src/ui/MainWindow.h
   src/ui/MatchFinderPanel.cpp
   src/ui/MatchFinderPanel.h
+  src/ui/SizeUnitWidgets.h
   resources/icons/icons.qrc
 )
 

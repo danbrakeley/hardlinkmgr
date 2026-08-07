@@ -92,4 +92,42 @@ Match Finder: the search options + results panel right of the file views (design
 - [x] **Line format:** every line is a single JSON object carrying `level` (`info`/`error` only), RFC 3339 UTC `time`, `msg`, and structured fields; awkward strings stay on one line. (automated: tst_logformat)
 - [x] **File behavior:** lines append across sessions, missing directories are created, no file is written until a path is set. (automated: tst_logger)
 - [x] **Link-run trail:** a successful link run logs its rename / hard link / unlink lines, in order, with the operations' paths. (automated: tst_linkrunner)
+
+## Link Finder
+
+"Add new Link Finder" (roadmap, top priority): a second tab beside Match Finder that
+recursively searches a single folder tree and groups files that already share an
+inode. Search + browse only — no linking action (that's a separate, lower-priority
+roadmap item).
+
+- [x] **Tab split:** connecting builds a Match Finder tab (existing panel + 2 views)
+      and a Link Finder tab (options+results panel + 1 view), each its own resizable
+      splitter with independently persisted state; every file browser view (Match
+      Finder's pair, plus Link Finder's own) comes up listing the share root.
+      (automated: tst_mainwindow)
+- [x] **Options persist / Start-Search-time path validation:** all Link Finder
+      Options persist across restarts; an invalid Search Path is rejected cleanly when
+      Start Search is clicked — no separate on-connect validation step, unlike Match
+      Finder. (automated: tst_linkfinderpanel)
+- [x] **Basic search + grouping:** files sharing an inode within the search path are
+      grouped, with per-row Links/Inode/Name/Path columns; Size Min and Link Min
+      filter results; Include Subfolders off keeps the search shallow. (automated:
+      tst_linksearcher, tst_linkgrouping)
+- [x] **Cancel mid-search:** cancelling reverts the button and produces no further
+      results; late listing replies are dropped silently. (automated:
+      tst_linkfinderpanel, tst_linksearcher)
+- [x] **Reveal on selection:** selecting a results row navigates the Link Finder tab's
+      file browser view to and highlights the matching file. (automated:
+      tst_linkfinderpanel)
+- [x] **Stat pump paused during search:** while a Match/Link Finder search runs, every
+      file browser view's lazy per-file stat lookups (the Links column fill-in) pause
+      and resume automatically once the search finishes — SmbSession has no worker
+      thread, so that traffic otherwise competes with the search's own listings on the
+      shared connection. (automated: tst_mainwindow) A separate, larger contributor to
+      search slowdown — synchronous OS icon lookups blocking the GUI thread — is
+      tracked separately in `roadmap.md` ("Move OS icon lookups off the GUI thread")
+      and not yet fixed.
+- [ ] **Splitter feel:** drag the Link Finder splitter's divider (default 50/50),
+      disconnect, reconnect, then quit and relaunch — the position is restored each
+      time. (manual — perceptual, same class as Milestone 7's own splitter check)
 - [ ] **On the real app:** connect, run one link, disconnect. The app-data `log.jsonl` gained connecting/connected, the three write lines, and disconnected — and no line contains the password. (manual)

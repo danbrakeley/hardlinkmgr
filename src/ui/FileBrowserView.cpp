@@ -165,6 +165,12 @@ FileBrowserView::FileBrowserView(SmbSession *session, QWidget *parent)
     header->setSectionResizeMode(FileListModel::IconColumn, QHeaderView::Fixed);
     header->resizeSection(FileListModel::IconColumn,
                           m_tree->iconSize().isValid() ? m_tree->iconSize().width() + 12 : 28);
+    // Links is almost always a single digit; Inode should fit a 7-digit
+    // number without immediately needing a manual resize.
+    header->resizeSection(FileListModel::LinksColumn,
+                          header->fontMetrics().horizontalAdvance(tr("Links")) + 24);
+    header->resizeSection(FileListModel::InodeColumn,
+                          header->fontMetrics().horizontalAdvance(QStringLiteral("0000000")) + 24);
 
     auto *toolbarLayout = new QHBoxLayout;
     toolbarLayout->addWidget(m_upButton);
@@ -391,8 +397,22 @@ void FileBrowserView::resetStatQueue()
     pumpStats();
 }
 
+void FileBrowserView::setStatsPaused(bool paused)
+{
+    if (m_statsPaused == paused) {
+        return;
+    }
+    m_statsPaused = paused;
+    if (!m_statsPaused) {
+        pumpStats(); // catch up on whatever the current folder still needs
+    }
+}
+
 void FileBrowserView::pumpStats()
 {
+    if (m_statsPaused) {
+        return;
+    }
     while (m_statInFlight.size() < kMaxStatsInFlight) {
         const int row = nextStatRow();
         if (row < 0) {

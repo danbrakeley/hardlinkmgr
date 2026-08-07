@@ -3,6 +3,7 @@
 #include "ui/AboutDialog.h"
 #include "ui/FileBrowserView.h"
 #include "ui/IconUtil.h"
+#include "ui/LinkFinderPanel.h"
 #include "ui/MatchFinderPanel.h"
 
 #include <QAction>
@@ -16,6 +17,7 @@
 #include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
+#include <QTabWidget>
 #include <QTimer>
 #include <QToolBar>
 #include <QUrl>
@@ -106,6 +108,10 @@ void MainWindow::saveSplitterState()
         QSettings().setValue(QStringLiteral("window/hsplitterState"),
                              m_hSplitter->saveState());
     }
+    if (m_linkSplitter) {
+        QSettings().setValue(QStringLiteral("linkfinder/splitterState"),
+                             m_linkSplitter->saveState());
+    }
 }
 
 // Restores the last saved size/position, but only if enough of the title bar
@@ -193,11 +199,17 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
             m_centralLabel = new QLabel(this);
             m_centralLabel->setAlignment(Qt::AlignCenter);
             m_centralLabel->setEnabled(false); // renders the placeholder text greyed out
-            setCentralWidget(m_centralLabel); // deletes the splitters, views, and panel
+            setCentralWidget(m_centralLabel); // deletes the tab widget, splitters, views, and panels
+            m_tabWidget = nullptr;
             m_hSplitter = nullptr;
             m_splitter = nullptr;
             m_matchPanel = nullptr;
+            m_linkSplitter = nullptr;
+            m_linkPanel = nullptr;
+            m_linkView = nullptr;
             m_views.clear();
+            m_matchSearching = false;
+            m_linkSearching = false;
         }
         m_centralLabel->setText(tr("Not connected.\nEnter smb://user@host:port/share and press Connect."));
         statusBar()->showMessage(tr("Disconnected."));
@@ -221,7 +233,11 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
                                               m_toolBar->iconSize(), devicePixelRatioF()));
         m_urlEdit->setEnabled(false);
         QSettings().setValue(QStringLiteral("connect/lastUrl"), m_urlEdit->text().trimmed());
-        m_hSplitter = new QSplitter(Qt::Horizontal, this);
+
+        m_tabWidget = new QTabWidget(this);
+        m_tabWidget->setObjectName(QStringLiteral("mw.tabWidget"));
+
+        m_hSplitter = new QSplitter(Qt::Horizontal, m_tabWidget);
         m_hSplitter->setChildrenCollapsible(false);
         m_splitter = new QSplitter(Qt::Vertical, m_hSplitter);
         m_splitter->setChildrenCollapsible(false);
@@ -241,7 +257,38 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
         });
         connect(m_matchPanel, &MatchFinderPanel::statusMessage, this,
                 [this](const QString &message) { statusBar()->showMessage(message); });
-        setCentralWidget(m_hSplitter); // deletes the placeholder label
+        connect(m_matchPanel, &MatchFinderPanel::searchRunningChanged, this, [this](bool running) {
+            m_matchSearching = running;
+            updateStatsPaused();
+        });
+        m_tabWidget->addTab(m_hSplitter, tr("Match Finder"));
+
+        // Populate the Match Finder tab's 2 views before the Link Finder tab's
+        // single view is appended: onRevealRequested indexes m_views[0]/[1]
+        // directly, so those two slots must be the Match Finder views.
+        addView();
+        addView();
+
+        m_linkSplitter = new QSplitter(Qt::Horizontal, m_tabWidget);
+        m_linkSplitter->setChildrenCollapsible(false);
+        m_linkPanel = new LinkFinderPanel(m_session, m_linkSplitter);
+        m_linkSplitter->addWidget(m_linkPanel);
+        m_linkView = createView();
+        m_linkSplitter->addWidget(m_linkView);
+        m_linkView->navigateTo(QStringLiteral("/"));
+        m_linkSplitter->setStretchFactor(0, 1); // 50/50 by default
+        m_linkSplitter->setStretchFactor(1, 1);
+        connect(m_linkPanel, &LinkFinderPanel::revealRequested,
+                this, &MainWindow::onLinkFinderRevealRequested);
+        connect(m_linkPanel, &LinkFinderPanel::statusMessage, this,
+                [this](const QString &message) { statusBar()->showMessage(message); });
+        connect(m_linkPanel, &LinkFinderPanel::searchRunningChanged, this, [this](bool running) {
+            m_linkSearching = running;
+            updateStatsPaused();
+        });
+        m_tabWidget->addTab(m_linkSplitter, tr("Link Finder"));
+
+        setCentralWidget(m_tabWidget); // deletes the placeholder label
         m_centralLabel = nullptr;
         {
             const QByteArray state =
@@ -249,11 +296,12 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
             if (!state.isEmpty()) {
                 m_hSplitter->restoreState(state);
             }
+            const QByteArray linkState =
+                QSettings().value(QStringLiteral("linkfinder/splitterState")).toByteArray();
+            if (!linkState.isEmpty()) {
+                m_linkSplitter->restoreState(linkState);
+            }
         }
-
-        // start with 2 views
-        addView();
-        addView();
 
         m_matchPanel->beginPathValidation();
         statusBar()->showMessage(tr("Connected to %1.").arg(m_shareDisplayName));
@@ -261,11 +309,8 @@ void MainWindow::onSessionStateChanged(SmbSession::State state)
     }
 }
 
-void MainWindow::addView()
+FileBrowserView *MainWindow::createView()
 {
-    if (!m_splitter) {
-        return;
-    }
     auto *view = new FileBrowserView(m_session, this);
     connect(view, &FileBrowserView::errorOccurred,
             this, &MainWindow::onSessionError);
@@ -273,6 +318,15 @@ void MainWindow::addView()
             this, &MainWindow::onIconModeChangeRequested);
     view->setIconMode(currentIconMode());
     m_views.append(view);
+    return view;
+}
+
+void MainWindow::addView()
+{
+    if (!m_splitter) {
+        return;
+    }
+    auto *view = createView();
     m_splitter->addWidget(view);
     view->navigateTo(QStringLiteral("/"));
 }
@@ -288,6 +342,17 @@ void MainWindow::onIconModeChangeRequested(FileListModel::IconMode mode)
     QSettings().setValue(QStringLiteral("view/iconMode"), int(mode));
     for (FileBrowserView *view : std::as_const(m_views)) {
         view->setIconMode(mode);
+    }
+}
+
+// Every FileBrowserView's lazy stat pump shares the one SmbSession with the
+// Match/Link Finder searchers; a folder with many files otherwise starves the
+// search's own listings of round trips on that connection.
+void MainWindow::updateStatsPaused()
+{
+    const bool paused = m_matchSearching || m_linkSearching;
+    for (FileBrowserView *view : std::as_const(m_views)) {
+        view->setStatsPaused(paused);
     }
 }
 
@@ -310,6 +375,15 @@ void MainWindow::onRevealRequested(const QString &primaryFolder, const QString &
     }
     m_views[0]->navigateToAndReveal(primaryFolder, primaryName);
     m_views[1]->navigateToAndReveal(secondaryFolder, secondaryName);
+}
+
+// A Link Finder result row was selected: the Link Finder tab's single view
+// shows it.
+void MainWindow::onLinkFinderRevealRequested(const QString &folder, const QString &name)
+{
+    if (m_linkView) {
+        m_linkView->navigateToAndReveal(folder, name);
+    }
 }
 
 // The session emits stateChanged(Disconnected) before errorOccurred(), so the

@@ -71,9 +71,11 @@ hlm_add_test(tst_logformat            SOURCES unit/tst_logformat.cpp            
 hlm_add_test(tst_logger               SOURCES unit/tst_logger.cpp               LABELS "unit")
 hlm_add_test(tst_matchpairing         SOURCES unit/tst_matchpairing.cpp         LABELS "unit")
 hlm_add_test(tst_matchconflicts       SOURCES unit/tst_matchconflicts.cpp       LABELS "unit")
+hlm_add_test(tst_linkgrouping         SOURCES unit/tst_linkgrouping.cpp         LABELS "unit")
 hlm_add_test(tst_filelistmodel        SOURCES unit/tst_filelistmodel.cpp        LABELS "unit")
 hlm_add_test(tst_filefilterproxymodel SOURCES unit/tst_filefilterproxymodel.cpp LABELS "unit")
 hlm_add_test(tst_matchresultsmodel    SOURCES unit/tst_matchresultsmodel.cpp    LABELS "unit")
+hlm_add_test(tst_linkresultsmodel     SOURCES unit/tst_linkresultsmodel.cpp     LABELS "unit")
 hlm_add_test(tst_versioncompare       SOURCES unit/tst_versioncompare.cpp       LABELS "unit")
 
 # Connect failures that need no server (bogus DNS, unroutable IP).
@@ -119,6 +121,11 @@ if(HLM_DOCKER)
     LABELS "docker"
     FIXTURES samba)
 
+  hlm_add_test(tst_linksearcher
+    SOURCES integration/tst_linksearcher.cpp common/SmbFixture.cpp
+    LABELS "docker"
+    FIXTURES samba)
+
   hlm_add_test(tst_mainwindow
     SOURCES widget/tst_mainwindow.cpp common/SmbFixture.cpp
     LABELS "docker;widget"
@@ -131,6 +138,11 @@ if(HLM_DOCKER)
 
   hlm_add_test(tst_matchfinderpanel
     SOURCES widget/tst_matchfinderpanel.cpp common/SmbFixture.cpp common/TestSupport.cpp
+    LABELS "docker;widget"
+    FIXTURES samba)
+
+  hlm_add_test(tst_linkfinderpanel
+    SOURCES widget/tst_linkfinderpanel.cpp common/SmbFixture.cpp
     LABELS "docker;widget"
     FIXTURES samba)
 else()

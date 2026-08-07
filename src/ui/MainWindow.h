@@ -14,10 +14,12 @@ class QCloseEvent;
 class QLabel;
 class QLineEdit;
 class QSplitter;
+class QTabWidget;
 class QTimer;
 class QToolBar;
 
 class FileBrowserView;
+class LinkFinderPanel;
 class MatchFinderPanel;
 
 class MainWindow : public QMainWindow
@@ -42,9 +44,12 @@ private:
     void saveSplitterState();
     void onConnectActionTriggered();
     void onAboutActionTriggered();
+    FileBrowserView *createView();
     void addView();
     void onRevealRequested(const QString &primaryFolder, const QString &primaryName,
                            const QString &secondaryFolder, const QString &secondaryName);
+    void onLinkFinderRevealRequested(const QString &folder, const QString &name);
+    void updateStatsPaused(); // pauses every view's lazy stat pump while either search runs
     void onSessionStateChanged(SmbSession::State state);
     void onSessionError(const QString &message);
     FileListModel::IconMode currentIconMode() const;
@@ -58,10 +63,16 @@ private:
     QAction *m_connectAction = nullptr;
     QAction *m_aboutAction = nullptr;
     QLabel *m_centralLabel = nullptr;         // placeholder while not connected
-    QSplitter *m_hSplitter = nullptr;         // central widget while connected
+    QTabWidget *m_tabWidget = nullptr;        // central widget while connected
+    QSplitter *m_hSplitter = nullptr;         // Match Finder tab
     QSplitter *m_splitter = nullptr;          // left side: the stacked views
     MatchFinderPanel *m_matchPanel = nullptr; // right side of m_hSplitter
-    QList<FileBrowserView *> m_views;         // children of m_splitter
+    QSplitter *m_linkSplitter = nullptr;      // Link Finder tab
+    LinkFinderPanel *m_linkPanel = nullptr;   // left side of m_linkSplitter
+    FileBrowserView *m_linkView = nullptr;    // right side of m_linkSplitter
+    QList<FileBrowserView *> m_views;         // every FileBrowserView in either tab
+    bool m_matchSearching = false; // mirrors MatchFinderPanel::searchRunningChanged
+    bool m_linkSearching = false;  // mirrors LinkFinderPanel::searchRunningChanged
     QTimer *m_spinnerTimer = nullptr;
     int m_spinnerAngle = 0;
     QString m_shareDisplayName; // user@host/share of the current/last attempt

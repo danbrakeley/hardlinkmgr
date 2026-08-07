@@ -1,11 +1,14 @@
 #include <QtTest>
 
 #include <QLineEdit>
+#include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
+#include <QTabWidget>
 
 #include "ui/FileBrowserView.h"
+#include "ui/LinkFinderPanel.h"
 #include "ui/MainWindow.h"
 #include "ui/MatchFinderPanel.h"
 
@@ -15,8 +18,8 @@
 // The main-window connect flow and toolbar logic, driven through the real
 // widgets with a stubbed password prompt (the modal QInputDialog never runs
 // under test). Covers testing.md M1 "Connect"/"Disconnect"/"Cancelled
-// password prompt"/"Bad URL", M5 "Cross-view selection"/"Remembered URL",
-// and the M7 panel layout.
+// password prompt"/"Bad URL", M5 "Cross-view selection"/"Remembered URL", the
+// M7 panel layout, and the Match Finder / Link Finder tab split.
 class TestMainWindow : public QObject
 {
     Q_OBJECT
@@ -27,7 +30,8 @@ private slots:
     void badUrlShowsErrorWithoutPrompt();
     void emptyUrlAsksForOne();
     void cancelledPromptStaysDisconnected();
-    void connectFlowBuildsTwoViewsAndPanel();
+    void connectFlowBuildsTabsViewsAndPanels();
+    void searchPausesEveryViewsStatPump();
     void disconnectRestoresPlaceholder();
     void rememberedUrl();
 
@@ -109,21 +113,68 @@ void TestMainWindow::cancelledPromptStaysDisconnected()
     QCOMPARE(window.findChildren<FileBrowserView *>().size(), 0);
 }
 
-void TestMainWindow::connectFlowBuildsTwoViewsAndPanel()
+void TestMainWindow::connectFlowBuildsTabsViewsAndPanels()
 {
     MainWindow window;
     connectWindow(window);
 
-    // Exactly two views (ADR 0003) left of the Match Finder panel.
-    QCOMPARE(window.findChildren<FileBrowserView *>().size(), 2);
+    // A Match Finder tab (2 views, ADR 0003, left of the panel) and a Link
+    // Finder tab (1 view, right of its panel) — 3 FileBrowserViews total.
+    QCOMPARE(window.findChildren<FileBrowserView *>().size(), 3);
     QCOMPARE(window.findChildren<MatchFinderPanel *>().size(), 1);
-    QVERIFY(qobject_cast<QSplitter *>(window.centralWidget()));
+    QCOMPARE(window.findChildren<LinkFinderPanel *>().size(), 1);
+
+    auto *tabWidget = window.findChild<QTabWidget *>("mw.tabWidget");
+    QVERIFY(tabWidget);
+    QCOMPARE(tabWidget, window.centralWidget());
+    QCOMPARE(tabWidget->count(), 2);
+    QCOMPARE(tabWidget->tabText(0), "Match Finder");
+    QCOMPARE(tabWidget->tabText(1), "Link Finder");
+    QVERIFY(qobject_cast<QSplitter *>(tabWidget->widget(0)));
+    QVERIFY(qobject_cast<QSplitter *>(tabWidget->widget(1)));
+
     QVERIFY(!window.findChild<QLineEdit *>("mw.urlEdit")->isEnabled());
     QVERIFY(window.statusBar()->currentMessage().startsWith("Connected to"));
 
-    // Both views come up listing the share root.
+    // Every view comes up listing the share root.
     for (FileBrowserView *view : window.findChildren<FileBrowserView *>()) {
         QTRY_COMPARE(view->currentPath(), "/");
+    }
+}
+
+// SmbSession has no worker thread, so a folder's worth of lazy stat calls
+// competes with a running search for the same GUI-thread-serviced
+// connection; MainWindow pauses every view's pump while either search runs.
+void TestMainWindow::searchPausesEveryViewsStatPump()
+{
+    const QString dir = m_fx.makeCaseDir("statpause");
+    m_fx.seedFile(dir, "a.bin", 100);
+    m_fx.seedFile(dir, "b.bin", 100);
+
+    MainWindow window;
+    connectWindow(window);
+
+    QList<FileBrowserView *> views = window.findChildren<FileBrowserView *>();
+    QCOMPARE(views.size(), 3);
+    for (FileBrowserView *view : views) {
+        QVERIFY(!view->statsPaused());
+    }
+
+    auto *linkPanel = window.findChild<LinkFinderPanel *>();
+    QSignalSpy runningSpy(linkPanel, &LinkFinderPanel::searchRunningChanged);
+    linkPanel->findChild<QLineEdit *>("lfp.searchPath")->setText(dir);
+    linkPanel->findChild<QPushButton *>("lfp.startButton")->click();
+
+    QTRY_COMPARE(runningSpy.count(), 1);
+    QVERIFY(runningSpy.first().at(0).toBool());
+    for (FileBrowserView *view : views) {
+        QVERIFY(view->statsPaused());
+    }
+
+    QTRY_COMPARE(runningSpy.count(), 2);
+    QVERIFY(!runningSpy.last().at(0).toBool());
+    for (FileBrowserView *view : views) {
+        QVERIFY(!view->statsPaused());
     }
 }
 

@@ -43,6 +43,11 @@ signals:
     void linkRunFinished(); // files changed on the share; refresh the views
     void statusMessage(const QString &message); // for the main status bar
 
+    // The search just started or just stopped (finished/failed/cancelled).
+    // MainWindow pauses every view's lazy stat pump while any search runs,
+    // since they share one SmbSession.
+    void searchRunningChanged(bool running);
+
 private:
     void loadSettings();
     void wireSettingsSaves();
@@ -61,8 +66,6 @@ private:
     {
         return !m_primaryValidating.isEmpty() || !m_secondaryValidating.isEmpty();
     }
-
-    static quint64 byteValue(const QSpinBox *value, const QComboBox *unit);
 
     SmbSession *m_session = nullptr;
     MatchSearcher *m_searcher = nullptr;
@@ -87,4 +90,5 @@ private:
     QString m_primaryValidating;   // path awaiting on-connect validation
     QString m_secondaryValidating;
     QList<int> m_jobRows;          // LinkRunner job index -> model row
+    bool m_lastSearching = false;  // last value emitted via searchRunningChanged
 };

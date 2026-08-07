@@ -15,14 +15,13 @@
 #include <QTreeView>
 #include <QVBoxLayout>
 
-#include <limits>
-
 #include "core/LinkRunner.h"
 #include "core/MatchConflicts.h"
 #include "core/PathUtil.h"
 #include "models/MatchResultsModel.h"
 #include "smb/SmbSession.h"
 #include "ui/CheckBoxHeader.h"
+#include "ui/SizeUnitWidgets.h"
 
 namespace {
 
@@ -38,21 +37,6 @@ const auto kKeySizeDiffUnit = QStringLiteral("matchfinder/sizeDiffUnit");
 constexpr int kDefaultSizeMinValue = 10; // MiB
 constexpr int kDefaultSizeDiffValue = 0; // MiB
 constexpr int kUnitMiB = 2;              // index into the units dropdown
-
-QComboBox *makeUnitCombo(QWidget *parent)
-{
-    auto *combo = new QComboBox(parent);
-    combo->addItems({QStringLiteral("bytes"), QStringLiteral("KiB"),
-                     QStringLiteral("MiB"), QStringLiteral("GiB")});
-    return combo;
-}
-
-QSpinBox *makeSizeSpin(QWidget *parent)
-{
-    auto *spin = new QSpinBox(parent);
-    spin->setRange(0, std::numeric_limits<int>::max());
-    return spin;
-}
 
 } // namespace
 
@@ -78,13 +62,13 @@ MatchFinderPanel::MatchFinderPanel(SmbSession *session, QWidget *parent)
     m_secondaryPathEdit->setPlaceholderText(QStringLiteral("/path/to/folder"));
     m_secondaryRecurse = new QCheckBox(tr("Include Subfolders"), m_optionsForm);
     m_secondaryRecurse->setObjectName(QStringLiteral("mfp.secondaryRecurse"));
-    m_sizeMinValue = makeSizeSpin(m_optionsForm);
+    m_sizeMinValue = sizeunits::makeSizeSpin(m_optionsForm);
     m_sizeMinValue->setObjectName(QStringLiteral("mfp.sizeMinValue"));
-    m_sizeMinUnit = makeUnitCombo(m_optionsForm);
+    m_sizeMinUnit = sizeunits::makeUnitCombo(m_optionsForm);
     m_sizeMinUnit->setObjectName(QStringLiteral("mfp.sizeMinUnit"));
-    m_sizeDiffValue = makeSizeSpin(m_optionsForm);
+    m_sizeDiffValue = sizeunits::makeSizeSpin(m_optionsForm);
     m_sizeDiffValue->setObjectName(QStringLiteral("mfp.sizeDiffValue"));
-    m_sizeDiffUnit = makeUnitCombo(m_optionsForm);
+    m_sizeDiffUnit = sizeunits::makeUnitCombo(m_optionsForm);
     m_sizeDiffUnit->setObjectName(QStringLiteral("mfp.sizeDiffUnit"));
 
     auto *grid = new QGridLayout(m_optionsForm);
@@ -256,11 +240,6 @@ void MatchFinderPanel::wireSettingsSaves()
     });
 }
 
-quint64 MatchFinderPanel::byteValue(const QSpinBox *value, const QComboBox *unit)
-{
-    return quint64(value->value()) << (10 * unit->currentIndex());
-}
-
 void MatchFinderPanel::beginPathValidation()
 {
     const QString primary = m_primaryPathEdit->text().trimmed();
@@ -339,8 +318,8 @@ void MatchFinderPanel::onStartClicked()
     options.secondaryPath = pathutil::normalize(secondary);
     options.primaryRecursive = m_primaryRecurse->isChecked();
     options.secondaryRecursive = m_secondaryRecurse->isChecked();
-    options.sizeMinBytes = byteValue(m_sizeMinValue, m_sizeMinUnit);
-    options.sizeDiffBytes = byteValue(m_sizeDiffValue, m_sizeDiffUnit);
+    options.sizeMinBytes = sizeunits::byteValue(m_sizeMinValue, m_sizeMinUnit);
+    options.sizeDiffBytes = sizeunits::byteValue(m_sizeDiffValue, m_sizeDiffUnit);
 
     m_model->setMatches({});
     m_statusLabel->setText(tr("Searching…"));
@@ -449,4 +428,9 @@ void MatchFinderPanel::updateControls()
     m_startButton->setEnabled(searching || (!linking && !validationPending()));
     m_linkButton->setEnabled(!searching && !linking && m_model->checkedCount() > 0);
     m_optionsForm->setEnabled(!searching && !linking);
+
+    if (searching != m_lastSearching) {
+        m_lastSearching = searching;
+        emit searchRunningChanged(searching);
+    }
 }
